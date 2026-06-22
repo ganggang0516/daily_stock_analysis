@@ -243,7 +243,7 @@ jobs:
           # ==========================================
           # 数据源
           # ==========================================
-          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          TUSHARE_TOKEN: ${{ vars.TUSHARE_TOKEN || secrets.TUSHARE_TOKEN }}
           # Longbridge OpenAPI（美股/港股实时行情字段补充；不设则仅 YFinance/AkShare，无 [Longbridge] 调用）
           LONGBRIDGE_OAUTH_CLIENT_ID: ${{ vars.LONGBRIDGE_OAUTH_CLIENT_ID || secrets.LONGBRIDGE_OAUTH_CLIENT_ID }}
           LONGBRIDGE_OAUTH_TOKEN_CACHE_B64: ${{ secrets.LONGBRIDGE_OAUTH_TOKEN_CACHE_B64 }}
@@ -262,15 +262,15 @@ jobs:
           # ==========================================
           # 搜索服务
           # ==========================================
-          ANSPIRE_API_KEYS: ${{ secrets.ANSPIRE_API_KEYS }} 
+          ANSPIRE_API_KEYS: ${{ vars.ANSPIRE_API_KEYS || secrets.ANSPIRE_API_KEYS }} 
           ANSPIRE_LLM_MODEL: ${{ vars.ANSPIRE_LLM_MODEL || secrets.ANSPIRE_LLM_MODEL }}
           ANSPIRE_LLM_BASE_URL: ${{ vars.ANSPIRE_LLM_BASE_URL || secrets.ANSPIRE_LLM_BASE_URL }}
           ANSPIRE_LLM_ENABLED: ${{ vars.ANSPIRE_LLM_ENABLED || secrets.ANSPIRE_LLM_ENABLED }}
-          BOCHA_API_KEYS: ${{ secrets.BOCHA_API_KEYS }}
-          TAVILY_API_KEYS: ${{ secrets.TAVILY_API_KEYS }}
-          SERPAPI_API_KEYS: ${{ secrets.SERPAPI_API_KEYS }}
-          MINIMAX_API_KEYS: ${{ secrets.MINIMAX_API_KEYS }}
-          BRAVE_API_KEYS: ${{ secrets.BRAVE_API_KEYS }}
+          BOCHA_API_KEYS: ${{ vars.BOCHA_API_KEYS || secrets.BOCHA_API_KEYS }}
+          TAVILY_API_KEYS: ${{ vars.TAVILY_API_KEYS || secrets.TAVILY_API_KEYS }}
+          SERPAPI_API_KEYS: ${{ vars.SERPAPI_API_KEYS || secrets.SERPAPI_API_KEYS }}
+          MINIMAX_API_KEYS: ${{ vars.MINIMAX_API_KEYS || secrets.MINIMAX_API_KEYS }}
+          BRAVE_API_KEYS: ${{ vars.BRAVE_API_KEYS || secrets.BRAVE_API_KEYS }}
           SEARXNG_BASE_URLS: ${{ vars.SEARXNG_BASE_URLS || secrets.SEARXNG_BASE_URLS }}
           SEARXNG_PUBLIC_INSTANCES_ENABLED: ${{ vars.SEARXNG_PUBLIC_INSTANCES_ENABLED || secrets.SEARXNG_PUBLIC_INSTANCES_ENABLED }}
           NEWS_ENABLED: ${{ vars.NEWS_ENABLED || secrets.NEWS_ENABLED || 'true' }}
@@ -389,6 +389,11 @@ jobs:
           MAX_WORKERS: ${{ vars.MAX_WORKERS || secrets.MAX_WORKERS || '1' }}
           # 筹码分布：默认 false（云端接口不稳定）；需启用时在 Settings → Variables 添加 ENABLE_CHIP_DISTRIBUTION=true
           ENABLE_CHIP_DISTRIBUTION: ${{ vars.ENABLE_CHIP_DISTRIBUTION || secrets.ENABLE_CHIP_DISTRIBUTION || 'false' }}
+          ENABLE_EASTMONEY_PATCH: ${{ vars.ENABLE_EASTMONEY_PATCH || secrets.ENABLE_EASTMONEY_PATCH || 'true' }}
+          ENABLE_FUNDAMENTAL_PIPELINE: ${{ vars.ENABLE_FUNDAMENTAL_PIPELINE || secrets.ENABLE_FUNDAMENTAL_PIPELINE || 'true' }}
+          FUNDAMENTAL_STAGE_TIMEOUT_SECONDS: ${{ vars.FUNDAMENTAL_STAGE_TIMEOUT_SECONDS || secrets.FUNDAMENTAL_STAGE_TIMEOUT_SECONDS || '12' }}
+          FUNDAMENTAL_FETCH_TIMEOUT_SECONDS: ${{ vars.FUNDAMENTAL_FETCH_TIMEOUT_SECONDS || secrets.FUNDAMENTAL_FETCH_TIMEOUT_SECONDS || '5' }}
+          FUNDAMENTAL_RETRY_MAX: ${{ vars.FUNDAMENTAL_RETRY_MAX || secrets.FUNDAMENTAL_RETRY_MAX || '1' }}
           # 实时行情数据源优先级（腾讯有量比且稳定，推荐首选）
           # 可选值: tencent, akshare_sina, efinance, akshare_em, tushare
           # 如果有 Tushare Pro 高积分账号，可将 tushare 放在首位
@@ -413,6 +418,11 @@ jobs:
                 MODE="stocks-only"
                 export INTRADAY_SIGNAL_ALERT_ONLY="true"
                 echo "📡 盘中买卖点定时任务：仅运行自选股，若出现买点/卖点候选则发送提醒"
+                ;;
+              "0 10 * * 1-5")
+                MODE="full"
+                export INTRADAY_SIGNAL_ALERT_ONLY="false"
+                echo "🧾 日报定时任务：运行完整日报与大盘复盘"
                 ;;
             esac
           fi
@@ -479,6 +489,9 @@ jobs:
               echo "  SearXNG Public Instances: ✅ 已启用"
               ;;
           esac
+          echo "  筹码分布: $ENABLE_CHIP_DISTRIBUTION"
+          echo "  东财补丁: $ENABLE_EASTMONEY_PATCH"
+          echo "  基本面聚合: $ENABLE_FUNDAMENTAL_PIPELINE (${FUNDAMENTAL_STAGE_TIMEOUT_SECONDS}s)"
           echo ""
           echo "【通知渠道】"
           echo "  PushPlus: $([ -n "$PUSHPLUS_TOKEN" ] && echo '✅ 已配置' || echo '⚪ 未配置')"

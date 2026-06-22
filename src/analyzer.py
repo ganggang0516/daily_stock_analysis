@@ -433,6 +433,176 @@ def apply_placeholder_fill(result: "AnalysisResult", missing_fields: List[str]) 
                     phase_decision[field.rsplit(".", 1)[-1]] = phase_decision_placeholders[field]
 
 
+_INTEL_PLACEHOLDER_TEXTS = {
+    "",
+    "n/a",
+    "na",
+    "none",
+    "null",
+    "unknown",
+    "tbd",
+    "无",
+    "未知",
+    "待补充",
+    "数据缺失",
+    "数据缺失，无法判断",
+}
+
+
+def _is_missing_intelligence_text(value: Any) -> bool:
+    if value is None:
+        return True
+    if not isinstance(value, str):
+        return True
+    text = value.strip()
+    if not text:
+        return True
+    lowered = text.lower()
+    if lowered in _INTEL_PLACEHOLDER_TEXTS or text in _INTEL_PLACEHOLDER_TEXTS:
+        return True
+    return "数据缺失" in text and len(text) <= 20
+
+
+def _ensure_dashboard_intelligence(result: "AnalysisResult") -> Dict[str, Any]:
+    if not result.dashboard:
+        result.dashboard = {}
+    intelligence = result.dashboard.get("intelligence")
+    if not isinstance(intelligence, dict):
+        intelligence = {}
+        result.dashboard["intelligence"] = intelligence
+    return intelligence
+
+
+def _extract_intel_section_from_text(news_context: Optional[str], label: str) -> Optional[str]:
+    """Extract a compact human-readable section from SearchService formatted intel text."""
+    if not news_context:
+        return None
+
+    lines = news_context.splitlines()
+    start_index: Optional[int] = None
+    for idx, line in enumerate(lines):
+        if label in line:
+            start_index = idx + 1
+            break
+    if start_index is None:
+        return None
+
+    collected: List[str] = []
+    heading_pattern = re.compile(r"^\s*(?:[📰📋📈⚠️📊🏭]|##|【).*(?:最新消息|公司公告|机构分析|风险排查|业绩预期|行业分析|搜索结果)")
+    for line in lines[start_index:]:
+        stripped = line.strip()
+        if collected and heading_pattern.search(stripped):
+            break
+        if not stripped:
+            continue
+        if stripped.startswith("关联度:"):
+            continue
+        cleaned = re.sub(r"^\d+[.)]\s*", "", stripped)
+        cleaned = re.sub(r"^\-\s*", "", cleaned)
+        if cleaned:
+            collected.append(cleaned)
+        if len(collected) >= 4:
+            break
+
+    if not collected:
+        return None
+    text = "；".join(collected)
+    return text[:280]
+
+
+def _fmt_number(value: Any, suffix: str = "") -> Optional[str]:
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(number) or math.isinf(number):
+        return None
+    if abs(number) >= 100000000:
+        rendered = f"{number / 100000000:.2f}亿"
+    else:
+        rendered = f"{number:.2f}".rstrip("0").rstrip(".")
+    return f"{rendered}{suffix}"
+
+
+def _build_earnings_outlook_from_fundamental_context(fundamental_context: Any) -> Optional[str]:
+    if not isinstance(fundamental_context, dict):
+        return None
+    earnings_block = fundamental_context.get("earnings")
+    if not isinstance(earnings_block, dict):
+        return None
+    data = earnings_block.get("data") if isinstance(earnings_block.get("data"), dict) else earnings_block
+    if not isinstance(data, dict):
+        return None
+
+    parts: List[str] = []
+    forecast = data.get("forecast_summary")
+    if isinstance(forecast, str) and forecast.strip():
+        parts.append(f"业绩预告: {forecast.strip()}")
+    quick = data.get("quick_report_summary")
+    if isinstance(quick, str) and quick.strip():
+        parts.append(f"业绩快报: {quick.strip()}")
+
+    financial = data.get("financial_report")
+    if isinstance(financial, dict):
+        metrics: List[str] = []
+        report_date = financial.get("report_date")
+        if report_date:
+            metrics.append(f"报告期 {report_date}")
+        revenue = _fmt_number(financial.get("revenue"))
+        if revenue:
+            metrics.append(f"营收 {revenue}")
+        net_profit = _fmt_number(financial.get("net_profit_parent"))
+        if net_profit:
+            metrics.append(f"归母净利 {net_profit}")
+        roe = _fmt_number(financial.get("roe"), "%")
+        if roe:
+            metrics.append(f"ROE {roe}")
+        if metrics:
+            parts.append("财报摘要: " + "，".join(metrics))
+
+    dividend = data.get("dividend")
+    if isinstance(dividend, dict):
+        dividend_bits: List[str] = []
+        cash = _fmt_number(dividend.get("ttm_cash_dividend_per_share"))
+        if cash:
+            dividend_bits.append(f"近12个月每股现金分红 {cash}")
+        yield_pct = _fmt_number(dividend.get("ttm_dividend_yield_pct"), "%")
+        if yield_pct:
+            dividend_bits.append(f"股息率 {yield_pct}")
+        if dividend_bits:
+            parts.append("分红: " + "，".join(dividend_bits))
+
+    if not parts:
+        return None
+    return "；".join(parts)[:320]
+
+
+def fill_intelligence_from_sources_if_needed(
+    result: "AnalysisResult",
+    *,
+    news_context: Optional[str] = None,
+    fundamental_context: Any = None,
+) -> None:
+    """Backfill report intelligence fields from retrieved source evidence when the LLM leaves placeholders."""
+    if not result:
+        return
+    intelligence = _ensure_dashboard_intelligence(result)
+
+    if _is_missing_intelligence_text(intelligence.get("latest_news")):
+        latest_news = _extract_intel_section_from_text(news_context, "最新消息")
+        if latest_news:
+            intelligence["latest_news"] = latest_news
+
+    if _is_missing_intelligence_text(intelligence.get("earnings_outlook")):
+        earnings = _build_earnings_outlook_from_fundamental_context(fundamental_context)
+        if not earnings:
+            earnings = _extract_intel_section_from_text(news_context, "业绩预期")
+        if earnings:
+            intelligence["earnings_outlook"] = earnings
+
+
 # ---------- chip_structure fallback (Issue #589) ----------
 
 _CHIP_KEYS: tuple = ("profit_ratio", "avg_cost", "concentration", "chip_health")
@@ -2953,6 +3123,11 @@ class GeminiAnalyzer:
                 result.model_used = model_used
                 result.report_language = report_language
                 normalize_chip_structure_availability(result, context.get("chip"))
+                fill_intelligence_from_sources_if_needed(
+                    result,
+                    news_context=news_context,
+                    fundamental_context=context.get("fundamental_context"),
+                )
 
                 # 内容完整性校验（可选）
                 if not config.report_integrity_enabled:

@@ -180,6 +180,26 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
         _, kwargs = pipeline._send_notifications.call_args
         self.assertTrue(kwargs["skip_push"])
 
+    def test_run_deduplicates_normalized_stock_codes_before_analysis(self):
+        pipeline = self._build_batch_pipeline()
+        pipeline.config.single_stock_notify = False
+        seen_codes = []
+
+        def _process(code, skip_analysis=False, single_stock_notify=False, report_type=None, analysis_query_id=None, current_time=None):
+            seen_codes.append(code)
+            return _make_result(code)
+
+        pipeline.process_single_stock = MagicMock(side_effect=_process)
+
+        results = pipeline.run(
+            stock_codes=["002827", "SZ002827", "002827.SZ", "300502", "SZ.300502"],
+            dry_run=False,
+            send_notification=False,
+        )
+
+        self.assertEqual([result.code for result in results], ["002827", "300502"])
+        self.assertEqual(seen_codes, ["002827", "300502"])
+
     def test_process_single_stock_direct_path_keeps_notify_compatibility(self):
         pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
         pipeline.fetch_and_save_stock_data = MagicMock(return_value=(True, None))
