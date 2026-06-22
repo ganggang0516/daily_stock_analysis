@@ -17,6 +17,11 @@ def _source_name_from_quote(quote: Any) -> Optional[str]:
     return str(value) if value is not None else None
 
 
+def _source_name_from_chip(chip: Any) -> Optional[str]:
+    source = getattr(chip, "source", None)
+    return str(source) if source is not None else None
+
+
 class MarketDataRouter:
     """Route quote/K-line/fundamental requests through a single fail-open facade."""
 
@@ -163,6 +168,77 @@ class MarketDataRouter:
             ],
             status=status,
             insufficient_reason=None if status == SourceStatus.OK else "数据不足，无法生成交易观察：日线数据为空",
+        )
+
+    def get_chip_distribution(self, stock_code: str) -> MarketDataBundle:
+        started_at = utc_now_iso()
+        try:
+            chip = self.fetcher_manager.get_chip_distribution(stock_code)
+        except Exception as exc:
+            ended_at = utc_now_iso()
+            self.health.record_failure("chip_router", str(exc))
+            logger.warning("[market-router] chip distribution failed for %s: %s", stock_code, exc)
+            return MarketDataBundle(
+                stock_code=stock_code,
+                source_name=None,
+                data_timestamp=ended_at,
+                chip_distribution=None,
+                attempts=[
+                    SourceAttempt(
+                        source_name="chip_router",
+                        status=SourceStatus.FAILED,
+                        started_at=started_at,
+                        ended_at=ended_at,
+                        error_message=str(exc),
+                    )
+                ],
+                status=SourceStatus.FAILED,
+                insufficient_reason="筹码分布数据源异常，未纳入筹码判断；禁止据此编造筹码结论",
+            )
+
+        ended_at = utc_now_iso()
+        source_name = _source_name_from_chip(chip) or "chip_router"
+        if chip is not None:
+            data_timestamp = str(getattr(chip, "date", None) or ended_at)
+            self.health.record_success(source_name)
+            return MarketDataBundle(
+                stock_code=stock_code,
+                source_name=source_name,
+                data_timestamp=data_timestamp,
+                chip_distribution=chip,
+                attempts=[
+                    SourceAttempt(
+                        source_name=source_name,
+                        status=SourceStatus.OK,
+                        started_at=started_at,
+                        ended_at=ended_at,
+                        record_count=1,
+                    )
+                ],
+                status=SourceStatus.OK,
+            )
+
+        self.health.record_empty("chip_router", "empty or unsupported chip distribution")
+        return MarketDataBundle(
+            stock_code=stock_code,
+            source_name=None,
+            data_timestamp=ended_at,
+            chip_distribution=None,
+            attempts=[
+                SourceAttempt(
+                    source_name="chip_router",
+                    status=SourceStatus.EMPTY,
+                    started_at=started_at,
+                    ended_at=ended_at,
+                    error_message="empty or unsupported chip distribution",
+                    record_count=0,
+                )
+            ],
+            status=SourceStatus.EMPTY,
+            insufficient_reason=(
+                "筹码分布未启用、标的不支持或数据源暂不可用，未纳入筹码判断；"
+                "A股个股可尝试 AkShare stock_cyq_em 或 Tushare cyq_chips"
+            ),
         )
 
     def get_fundamental_context(self, stock_code: str, *, budget_seconds: Optional[float] = None) -> MarketDataBundle:

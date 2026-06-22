@@ -56,6 +56,7 @@ class MarketDataBundle:
     data_timestamp: str
     realtime_quote: Any = None
     kline_daily: Optional["pd.DataFrame"] = None
+    chip_distribution: Any = None
     fundamental_context: Optional[Dict[str, Any]] = None
     attempts: List[SourceAttempt] = field(default_factory=list)
     status: SourceStatus = SourceStatus.EMPTY
@@ -66,6 +67,8 @@ class MarketDataBundle:
         if self.realtime_quote is not None:
             return True
         if self.kline_daily is not None and not self.kline_daily.empty:
+            return True
+        if self.chip_distribution is not None:
             return True
         return False
 

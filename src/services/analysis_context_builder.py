@@ -317,24 +317,39 @@ def _build_technical_block(
 def _build_chip_block(artifacts: PipelineAnalysisArtifacts) -> AnalysisContextBlock:
     chip = _to_dict(artifacts.chip_data)
     if not chip:
+        chip_source_meta = _data_source_meta(artifacts, "chip")
         not_supported = bool((artifacts.metadata or {}).get("chip_not_supported"))
-        status = (
-            ContextFieldStatus.NOT_SUPPORTED
-            if not_supported
-            else ContextFieldStatus.MISSING
+        raw_status = str((chip_source_meta or {}).get("status") or "").strip().lower()
+        if raw_status == "failed":
+            status = ContextFieldStatus.FETCH_FAILED
+        elif raw_status == "not_supported":
+            status = ContextFieldStatus.NOT_SUPPORTED
+        elif raw_status == "disabled":
+            status = ContextFieldStatus.NOT_SUPPORTED
+        else:
+            status = (
+                ContextFieldStatus.NOT_SUPPORTED
+                if not_supported
+                else ContextFieldStatus.MISSING
+            )
+        missing_reason = (
+            (chip_source_meta or {}).get("insufficient_reason")
+            or (
+                "chip_not_supported"
+                if not_supported
+                else "chip_distribution_missing"
+            )
         )
         return AnalysisContextBlock(
             status=status,
             items={
                 "chip_distribution": AnalysisContextItem(
                     status=status,
-                    missing_reason=(
-                        "chip_not_supported"
-                        if not_supported
-                        else "chip_distribution_missing"
-                    ),
+                    missing_reason=str(missing_reason),
                 )
             },
+            source=(chip_source_meta or {}).get("source_name") if chip_source_meta else None,
+            metadata=chip_source_meta or {},
         )
 
     source = _source_text(chip.get("source"))
@@ -600,6 +615,18 @@ def _metadata_value(metadata: Dict[str, Any], *keys: str) -> Optional[str]:
         if value not in (None, ""):
             return str(value)
     return None
+
+
+def _data_source_meta(artifacts: PipelineAnalysisArtifacts, key: str) -> Dict[str, Any]:
+    enhanced = artifacts.enhanced_context if isinstance(artifacts.enhanced_context, dict) else {}
+    source_meta = enhanced.get("data_source_meta") if isinstance(enhanced.get("data_source_meta"), dict) else {}
+    candidate = source_meta.get(key) if isinstance(source_meta, dict) else None
+    if isinstance(candidate, dict):
+        return candidate
+    metadata = artifacts.metadata if isinstance(artifacts.metadata, dict) else {}
+    source_meta = metadata.get("data_sources") if isinstance(metadata.get("data_sources"), dict) else {}
+    candidate = source_meta.get(key) if isinstance(source_meta, dict) else None
+    return candidate if isinstance(candidate, dict) else {}
 
 
 def _metadata_iso_datetime_value(metadata: Dict[str, Any], *keys: str) -> Optional[str]:

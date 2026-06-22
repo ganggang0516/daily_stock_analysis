@@ -1000,17 +1000,29 @@ def _has_meaningful_chip_data(chip_data: Any) -> bool:
     )
 
 
-def _mark_chip_structure_unavailable(result: "AnalysisResult", language: str) -> None:
+def _mark_chip_structure_unavailable(
+    result: "AnalysisResult",
+    language: str,
+    unavailable_reason: Optional[str] = None,
+) -> None:
     if not result or not isinstance(result.dashboard, dict):
         return
     data_perspective = result.dashboard.get("data_perspective")
     if not isinstance(data_perspective, dict):
         return
     data_perspective["chip_structure"] = {}
-    data_perspective["chip_unavailable_reason"] = get_chip_unavailable_text(language)
+    data_perspective["chip_unavailable_reason"] = (
+        str(unavailable_reason).strip()
+        if str(unavailable_reason or "").strip()
+        else get_chip_unavailable_text(language)
+    )
 
 
-def normalize_chip_structure_availability(result: "AnalysisResult", chip_data: Any) -> None:
+def normalize_chip_structure_availability(
+    result: "AnalysisResult",
+    chip_data: Any,
+    unavailable_reason: Optional[str] = None,
+) -> None:
     """Fill valid chip metrics or collapse placeholder-only chip fields to one fallback line."""
     if not result:
         return
@@ -1018,7 +1030,7 @@ def normalize_chip_structure_availability(result: "AnalysisResult", chip_data: A
     if _has_meaningful_chip_data(chip_data):
         fill_chip_structure_if_needed(result, chip_data)
         return
-    _mark_chip_structure_unavailable(result, language)
+    _mark_chip_structure_unavailable(result, language, unavailable_reason=unavailable_reason)
 
 
 def fill_chip_structure_if_needed(result: "AnalysisResult", chip_data: Any) -> None:

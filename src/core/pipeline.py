@@ -477,13 +477,19 @@ class StockAnalysisPipeline:
 
             # Step 2: 获取筹码分布 - 使用统一入口，带熔断保护
             chip_data = None
+            chip_bundle = None
             try:
-                chip_data = self.fetcher_manager.get_chip_distribution(code)
+                chip_bundle = self._get_market_data_router().get_chip_distribution(code)
+                chip_data = chip_bundle.chip_distribution
                 if chip_data:
                     logger.info(f"{stock_name}({code}) 筹码分布: 获利比例={chip_data.profit_ratio:.1%}, "
-                              f"90%集中度={chip_data.concentration_90:.2%}")
+                              f"90%集中度={chip_data.concentration_90:.2%} "
+                              f"(来源: {chip_bundle.source_name}, 时间: {chip_bundle.data_timestamp})")
                 else:
-                    logger.debug(f"{stock_name}({code}) 筹码分布获取失败或已禁用")
+                    logger.info(
+                        f"{stock_name}({code}) 筹码分布未纳入判断"
+                        f"{'：' + chip_bundle.insufficient_reason if chip_bundle and chip_bundle.insufficient_reason else ''}"
+                    )
             except Exception as e:
                 logger.warning(f"{stock_name}({code}) 获取筹码分布失败: {e}")
 
@@ -578,6 +584,7 @@ class StockAnalysisPipeline:
                     market_phase_summary=market_phase_summary,
                     daily_market_context=daily_market_context,
                     portfolio_context=portfolio_context,
+                    chip_source_meta=chip_bundle.to_context_metadata() if chip_bundle else None,
                 )
 
             # Step 4: 多维度情报搜索（最新消息+风险排查+业绩预期）
@@ -690,6 +697,7 @@ class StockAnalysisPipeline:
             )
             enhanced_context["data_source_meta"] = {
                 "market": realtime_bundle.to_context_metadata() if realtime_bundle else None,
+                "chip": chip_bundle.to_context_metadata() if chip_bundle else None,
                 "fundamental": fundamental_bundle.to_context_metadata() if fundamental_bundle else None,
                 "news": news_bundle.to_context_metadata() if news_bundle else None,
             }
@@ -792,7 +800,9 @@ class StockAnalysisPipeline:
 
             # Step 7.6: chip_structure fallback (Issue #589) and unavailable collapse
             if result:
-                normalize_chip_structure_availability(result, chip_data)
+                chip_meta = enhanced_context.get("data_source_meta", {}).get("chip")
+                chip_reason = chip_meta.get("insufficient_reason") if isinstance(chip_meta, dict) else None
+                normalize_chip_structure_availability(result, chip_data, unavailable_reason=chip_reason)
 
             # Step 7.7: price_position fallback
             if result:
@@ -1222,6 +1232,7 @@ class StockAnalysisPipeline:
         market_phase_summary: Optional[Dict[str, Any]] = None,
         daily_market_context: Optional[DailyMarketContext] = None,
         portfolio_context: Optional[Dict[str, Any]] = None,
+        chip_source_meta: Optional[Dict[str, Any]] = None,
     ) -> Optional[AnalysisResult]:
         """
         使用 Agent 模式分析单只股票。
@@ -1262,6 +1273,8 @@ class StockAnalysisPipeline:
                 initial_context["realtime_quote"] = self._safe_to_dict(realtime_quote)
             if chip_data:
                 initial_context["chip_distribution"] = self._safe_to_dict(chip_data)
+            if chip_source_meta:
+                initial_context["data_source_meta"] = {"chip": dict(chip_source_meta)}
             if trend_result:
                 initial_context["trend_result"] = self._safe_to_dict(trend_result)
 
@@ -1387,8 +1400,10 @@ class StockAnalysisPipeline:
                         missing,
                     )
             # chip_structure fallback (Issue #589), before save_analysis_history
-            if result and chip_data is not None:
-                normalize_chip_structure_availability(result, chip_data)
+            if result:
+                chip_meta = initial_context.get("data_source_meta", {}).get("chip")
+                chip_reason = chip_meta.get("insufficient_reason") if isinstance(chip_meta, dict) else None
+                normalize_chip_structure_availability(result, chip_data, unavailable_reason=chip_reason)
 
             # price_position fallback (same as non-agent path Step 7.7)
             if result:
@@ -2614,7 +2629,9 @@ class StockAnalysisPipeline:
             market=market,
             phase=phase,
             base_context=daily_context,
-            enhanced_context={},
+            enhanced_context={
+                "data_source_meta": dict(initial_context.get("data_source_meta") or {})
+            },
             realtime_quote=initial_context.get("realtime_quote"),
             trend_result=initial_context.get("trend_result"),
             chip_data=initial_context.get("chip_distribution"),
