@@ -17,7 +17,13 @@ try:
 except ModuleNotFoundError:
     sys.modules["litellm"] = MagicMock()
 
-from src.analyzer import AnalysisResult, GeminiAnalyzer, check_content_integrity, apply_placeholder_fill
+from src.analyzer import (
+    AnalysisResult,
+    GeminiAnalyzer,
+    apply_placeholder_fill,
+    check_content_integrity,
+    fill_intelligence_from_sources_if_needed,
+)
 
 
 class TestCheckContentIntegrity(unittest.TestCase):
@@ -450,6 +456,81 @@ class TestApplyPlaceholderFill(unittest.TestCase):
         self.assertEqual(result.dashboard["core_conclusion"]["one_sentence"], "已有趋势摘要")
         self.assertEqual(result.dashboard["intelligence"]["risk_alerts"], ["跌破支撑需减仓"])
         self.assertEqual(result.dashboard["battle_plan"]["sniper_points"]["stop_loss"], "待补充")
+
+    def test_fills_intelligence_from_news_context_when_llm_leaves_placeholders(self) -> None:
+        result = AnalysisResult(
+            code="600519",
+            name="贵州茅台",
+            trend_prediction="看多",
+            sentiment_score=70,
+            operation_advice="持有",
+            analysis_summary="稳健",
+            decision_type="hold",
+            dashboard={
+                "intelligence": {
+                    "latest_news": "数据缺失",
+                    "earnings_outlook": "数据缺失",
+                }
+            },
+        )
+        news_context = """【贵州茅台 情报搜索结果】
+
+📰 最新消息 (来源: SerpAPI):
+  1. 贵州茅台发布新品渠道调整 [2026-06-22]
+     公司优化渠道结构，市场关注动销恢复。
+
+📊 业绩预期 (来源: SerpAPI):
+  1. 贵州茅台一季报收入保持增长
+     净利润同比增长，机构关注全年利润兑现。
+"""
+
+        fill_intelligence_from_sources_if_needed(result, news_context=news_context)
+
+        intel = result.dashboard["intelligence"]
+        self.assertIn("贵州茅台发布新品渠道调整", intel["latest_news"])
+        self.assertIn("一季报收入保持增长", intel["earnings_outlook"])
+
+    def test_fills_earnings_outlook_from_fundamental_context_first(self) -> None:
+        result = AnalysisResult(
+            code="600519",
+            name="贵州茅台",
+            trend_prediction="看多",
+            sentiment_score=70,
+            operation_advice="持有",
+            analysis_summary="稳健",
+            decision_type="hold",
+            dashboard={"intelligence": {"earnings_outlook": "数据缺失"}},
+        )
+        fundamental_context = {
+            "earnings": {
+                "status": "ok",
+                "data": {
+                    "forecast_summary": "预增",
+                    "quick_report_summary": "快报摘要",
+                    "financial_report": {
+                        "report_date": "2026-03-31",
+                        "revenue": 1000000000,
+                        "net_profit_parent": 300000000,
+                        "roe": 18.2,
+                    },
+                    "dividend": {
+                        "ttm_cash_dividend_per_share": 0.3,
+                        "ttm_dividend_yield_pct": 2.1,
+                    },
+                },
+            }
+        }
+
+        fill_intelligence_from_sources_if_needed(
+            result,
+            news_context="📊 业绩预期 (来源: Search):\n  1. 搜索摘要",
+            fundamental_context=fundamental_context,
+        )
+
+        earnings = result.dashboard["intelligence"]["earnings_outlook"]
+        self.assertIn("业绩预告: 预增", earnings)
+        self.assertIn("财报摘要", earnings)
+        self.assertIn("分红", earnings)
 
     def test_phase_decision_placeholder_fill_satisfies_integrity_contract(self) -> None:
         """Phase placeholders close the retry-exhausted integrity contract without fake conditions."""

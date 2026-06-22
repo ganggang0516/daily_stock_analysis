@@ -33,6 +33,7 @@ from src.data_sources import MarketDataRouter, NewsDataRouter
 from src.analyzer import (
     GeminiAnalyzer,
     AnalysisResult,
+    fill_intelligence_from_sources_if_needed,
     fill_price_position_if_needed,
     normalize_chip_structure_availability,
     populate_decision_action_fields,
@@ -795,6 +796,11 @@ class StockAnalysisPipeline:
 
             # Step 7.7: price_position fallback
             if result:
+                fill_intelligence_from_sources_if_needed(
+                    result,
+                    news_context=news_context,
+                    fundamental_context=fundamental_context,
+                )
                 fill_price_position_if_needed(result, trend_result, realtime_quote)
                 action_source_advice = getattr(result, "operation_advice", None)
                 stabilize_decision_with_structure(result, trend_result, fundamental_context)
@@ -1386,6 +1392,11 @@ class StockAnalysisPipeline:
 
             # price_position fallback (same as non-agent path Step 7.7)
             if result:
+                fill_intelligence_from_sources_if_needed(
+                    result,
+                    news_context=initial_context.get("news_context"),
+                    fundamental_context=fundamental_context,
+                )
                 fill_price_position_if_needed(result, trend_result, realtime_quote)
                 realtime_data = initial_context.get("realtime_quote", {})
                 if isinstance(realtime_data, dict):
@@ -2878,6 +2889,11 @@ class StockAnalysisPipeline:
         if not stock_codes:
             logger.error("未配置自选股列表，请在 .env 文件中设置 STOCK_LIST")
             return []
+
+        stock_codes = self._dedupe_stock_codes(stock_codes)
+        if not stock_codes:
+            logger.error("自选股列表去重后为空，请检查 STOCK_LIST")
+            return []
         
         logger.info(f"===== 开始分析 {len(stock_codes)} 只股票 =====")
         logger.info(f"股票列表: {', '.join(stock_codes)}")
@@ -3019,6 +3035,33 @@ class StockAnalysisPipeline:
                 self._send_notifications(results, report_type)
         
         return results
+
+    @staticmethod
+    def _dedupe_stock_codes(stock_codes: List[str]) -> List[str]:
+        """Normalize and de-duplicate configured stock codes while preserving order."""
+        unique_codes: List[str] = []
+        seen: set[str] = set()
+        duplicates: List[str] = []
+        for raw_code in stock_codes:
+            raw_text = str(raw_code or "").strip()
+            if not raw_text:
+                continue
+            try:
+                canonical = normalize_stock_code(raw_text)
+            except Exception:
+                canonical = raw_text.upper()
+            key = canonical.upper()
+            if key in seen:
+                duplicates.append(raw_text)
+                continue
+            seen.add(key)
+            unique_codes.append(canonical)
+        if duplicates:
+            logger.warning(
+                "自选股列表包含重复项，已按规范代码去重；重复项: %s",
+                ", ".join(duplicates),
+            )
+        return unique_codes
 
     @staticmethod
     def _env_flag_enabled(name: str, default: str = "false") -> bool:
