@@ -48,6 +48,7 @@ from src.llm.usage import (
     normalize_litellm_usage,
 )
 from src.storage import persist_llm_usage
+from src.data.fund_mapping import get_fund_name
 from src.data.stock_mapping import STOCK_NAME_MAP
 from src.report_language import (
     get_signal_level,
@@ -1700,6 +1701,10 @@ def get_stock_name_multi_source(
     # 2. 从静态映射表获取
     if stock_code in STOCK_NAME_MAP:
         return STOCK_NAME_MAP[stock_code]
+
+    fund_name = get_fund_name(stock_code, allow_network=False)
+    if fund_name:
+        return fund_name
 
     # 3. 从数据源获取
     if data_manager is None:

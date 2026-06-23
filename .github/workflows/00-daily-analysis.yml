@@ -394,7 +394,7 @@ jobs:
           MARKDOWN_TO_IMAGE_MAX_CHARS: ${{ vars.MARKDOWN_TO_IMAGE_MAX_CHARS || secrets.MARKDOWN_TO_IMAGE_MAX_CHARS || '15000' }}
           INTRADAY_SIGNAL_ALERT_ONLY: ${{ vars.INTRADAY_SIGNAL_ALERT_ONLY || secrets.INTRADAY_SIGNAL_ALERT_ONLY || 'false' }}
           INTRADAY_BUY_SIGNAL_MIN_SCORE: ${{ vars.INTRADAY_BUY_SIGNAL_MIN_SCORE || secrets.INTRADAY_BUY_SIGNAL_MIN_SCORE || '60' }}
-          INTRADAY_SIGNAL_SEND_EMPTY: ${{ vars.INTRADAY_SIGNAL_SEND_EMPTY || secrets.INTRADAY_SIGNAL_SEND_EMPTY || 'true' }}
+          INTRADAY_SIGNAL_SEND_EMPTY: ${{ vars.INTRADAY_SIGNAL_SEND_EMPTY || secrets.INTRADAY_SIGNAL_SEND_EMPTY || 'false' }}
           OPPORTUNITY_RADAR_ENABLED: ${{ vars.OPPORTUNITY_RADAR_ENABLED || secrets.OPPORTUNITY_RADAR_ENABLED || 'true' }}
           OPPORTUNITY_RADAR_MIN_SCORE: ${{ vars.OPPORTUNITY_RADAR_MIN_SCORE || secrets.OPPORTUNITY_RADAR_MIN_SCORE || '60' }}
           OPPORTUNITY_RADAR_TOP_N: ${{ vars.OPPORTUNITY_RADAR_TOP_N || secrets.OPPORTUNITY_RADAR_TOP_N || '6' }}
@@ -456,7 +456,8 @@ jobs:
               "40 1 * * 1-5"|"10 2 * * 1-5"|"40 2 * * 1-5"|"10 3 * * 1-5"|"10 5 * * 1-5"|"40 5 * * 1-5"|"10 6 * * 1-5"|"40 6 * * 1-5")
                 MODE="stocks-only"
                 export INTRADAY_SIGNAL_ALERT_ONLY="true"
-                echo "📡 盘中买卖点定时任务：仅运行自选股，若出现买点/卖点候选则发送提醒"
+                export INTRADAY_SIGNAL_SEND_EMPTY="false"
+                echo "📡 盘中买卖点定时任务：仅运行自选股，若出现买点/卖点候选则发送提醒；无候选不推送"
                 ;;
               "0 10 * * 1-5")
                 MODE="full"

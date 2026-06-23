@@ -3189,7 +3189,7 @@ class StockAnalysisPipeline:
                 candidates.append((signal, result))
 
         if not candidates:
-            if not self._env_flag_enabled("INTRADAY_SIGNAL_SEND_EMPTY", "true"):
+            if not self._env_flag_enabled("INTRADAY_SIGNAL_SEND_EMPTY", "false"):
                 logger.info("盘中信号提醒：本轮未发现买点/卖点候选，不发送 alert")
                 return
 
