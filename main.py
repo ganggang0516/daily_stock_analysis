@@ -635,6 +635,57 @@ def _save_reused_market_review_report(
         logger.warning("复用大盘上下文保存大盘复盘报告失败: %s", exc)
 
 
+def _send_opportunity_radar_if_enabled(
+    config: Config,
+    pipeline: Any,
+    results: Optional[List[Any]],
+    args: argparse.Namespace,
+) -> None:
+    """Send a separate opportunity radar after the normal daily analysis."""
+    if (
+        not getattr(config, 'opportunity_radar_enabled', False)
+        or not results
+        or getattr(args, 'no_notify', False)
+    ):
+        return
+    try:
+        if not pipeline.notifier.is_available():
+            logger.info("机会雷达已启用，但当前没有可用通知渠道，跳过推送")
+            return
+        from src.services.opportunity_radar import (
+            build_opportunity_radar_report,
+            parse_fund_candidate_specs,
+        )
+
+        min_score = max(0, int(getattr(config, 'opportunity_radar_min_score', 60) or 60))
+        top_n = max(1, int(getattr(config, 'opportunity_radar_top_n', 6) or 6))
+        fund_top_n = max(0, int(getattr(config, 'opportunity_radar_fund_top_n', 4) or 4))
+        fund_specs = parse_fund_candidate_specs(
+            getattr(config, 'opportunity_fund_list', []) or []
+        )
+        report = build_opportunity_radar_report(
+            results,
+            fund_specs=fund_specs,
+            min_score=min_score,
+            top_n=top_n,
+            fund_top_n=fund_top_n,
+        )
+        today = datetime.now(timezone(timedelta(hours=8))).strftime('%Y%m%d')
+        sent = pipeline.notifier.send(
+            report,
+            route_type="alert",
+            severity="info",
+            dedup_key=f"opportunity-radar:{today}",
+            cooldown_key=f"opportunity-radar:{today}",
+        )
+        if sent:
+            logger.info("机会雷达推送成功")
+        else:
+            logger.warning("机会雷达推送失败")
+    except Exception as exc:
+        logger.warning("机会雷达生成或推送失败: %s", exc)
+
+
 def run_full_analysis(
     config: Config,
     args: argparse.Namespace,
@@ -889,6 +940,8 @@ def run_full_analysis(
                         logger.info("已合并推送（个股+大盘复盘）")
                     else:
                         logger.warning("合并推送失败")
+
+        _send_opportunity_radar_if_enabled(config, pipeline, results, args)
 
         # 输出摘要
         if results:
