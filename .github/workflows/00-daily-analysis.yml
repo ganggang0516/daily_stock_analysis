@@ -384,6 +384,11 @@ jobs:
           INTRADAY_SIGNAL_ALERT_ONLY: ${{ vars.INTRADAY_SIGNAL_ALERT_ONLY || secrets.INTRADAY_SIGNAL_ALERT_ONLY || 'false' }}
           INTRADAY_BUY_SIGNAL_MIN_SCORE: ${{ vars.INTRADAY_BUY_SIGNAL_MIN_SCORE || secrets.INTRADAY_BUY_SIGNAL_MIN_SCORE || '60' }}
           INTRADAY_SIGNAL_SEND_EMPTY: ${{ vars.INTRADAY_SIGNAL_SEND_EMPTY || secrets.INTRADAY_SIGNAL_SEND_EMPTY || 'true' }}
+          OPPORTUNITY_RADAR_ENABLED: ${{ vars.OPPORTUNITY_RADAR_ENABLED || secrets.OPPORTUNITY_RADAR_ENABLED || 'true' }}
+          OPPORTUNITY_RADAR_MIN_SCORE: ${{ vars.OPPORTUNITY_RADAR_MIN_SCORE || secrets.OPPORTUNITY_RADAR_MIN_SCORE || '60' }}
+          OPPORTUNITY_RADAR_TOP_N: ${{ vars.OPPORTUNITY_RADAR_TOP_N || secrets.OPPORTUNITY_RADAR_TOP_N || '6' }}
+          OPPORTUNITY_RADAR_FUND_TOP_N: ${{ vars.OPPORTUNITY_RADAR_FUND_TOP_N || secrets.OPPORTUNITY_RADAR_FUND_TOP_N || '4' }}
+          OPPORTUNITY_FUND_LIST: ${{ vars.OPPORTUNITY_FUND_LIST || secrets.OPPORTUNITY_FUND_LIST }}
           MARKET_REVIEW_ENABLED: ${{ vars.MARKET_REVIEW_ENABLED || secrets.MARKET_REVIEW_ENABLED || 'true' }}
           ANALYSIS_DELAY: ${{ vars.ANALYSIS_DELAY || secrets.ANALYSIS_DELAY || '0' }}
           TRADING_DAY_CHECK_ENABLED: ${{ vars.TRADING_DAY_CHECK_ENABLED || secrets.TRADING_DAY_CHECK_ENABLED || 'true' }}
@@ -450,6 +455,8 @@ jobs:
           echo "🔔 盘中信号提醒: $INTRADAY_SIGNAL_ALERT_ONLY"
           echo "📭 无信号状态推送: $INTRADAY_SIGNAL_SEND_EMPTY"
           echo "🎯 买点提醒最低评分: $INTRADAY_BUY_SIGNAL_MIN_SCORE"
+          echo "🧭 机会雷达: $OPPORTUNITY_RADAR_ENABLED (min=$OPPORTUNITY_RADAR_MIN_SCORE, top=$OPPORTUNITY_RADAR_TOP_N)"
+          echo "🧺 场外基金候选: $([ -n "$OPPORTUNITY_FUND_LIST" ] && echo '✅ 已配置' || echo '⚪ 未配置')"
           echo ""
           echo "=========================================="
           echo "📋 配置检查"
@@ -507,6 +514,7 @@ jobs:
           echo "  东财补丁: $ENABLE_EASTMONEY_PATCH"
           echo "  东财授权补丁: $EASTMONEY_AUTH_PATCH_ENABLED"
           echo "  基本面聚合: $ENABLE_FUNDAMENTAL_PIPELINE (${FUNDAMENTAL_STAGE_TIMEOUT_SECONDS}s)"
+          echo "  机会雷达: $OPPORTUNITY_RADAR_ENABLED"
           echo ""
           echo "【通知渠道】"
           echo "  PushPlus: $([ -n "$PUSHPLUS_TOKEN" ] && echo '✅ 已配置' || echo '⚪ 未配置')"

@@ -64,6 +64,12 @@ _CATEGORY_DEFINITIONS: List[Dict[str, Any]] = [
         "display_order": 60,
     },
     {
+        "category": "opportunity",
+        "title": "Opportunity Radar",
+        "description": "Daily opportunity watchlist and fund candidate radar.",
+        "display_order": 65,
+    },
+    {
         "category": "uncategorized",
         "title": "Uncategorized",
         "description": "Keys not mapped in the field registry.",
@@ -3363,6 +3369,134 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "OPPORTUNITY_RADAR_ENABLED": {
+        "title": "Opportunity Radar Enabled",
+        "description": "Send a separate daily opportunity radar after stock analysis. It ranks candidates and risk controls, but does not guarantee returns.",
+        "category": "opportunity",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 10,
+        "help_key": "settings.opportunity.OPPORTUNITY_RADAR_ENABLED",
+        "examples": [
+            "OPPORTUNITY_RADAR_ENABLED=true",
+            "OPPORTUNITY_RADAR_MIN_SCORE=60",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：机会雷达",
+                "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md#机会雷达",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "OPPORTUNITY_RADAR_MIN_SCORE": {
+        "title": "Opportunity Radar Min Score",
+        "description": "Minimum radar score required for A-share/ETF candidates.",
+        "category": "opportunity",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "60",
+        "options": [],
+        "validation": {"min": 0, "max": 100},
+        "display_order": 20,
+        "help_key": "settings.opportunity.score",
+        "examples": [
+            "OPPORTUNITY_RADAR_MIN_SCORE=60",
+            "OPPORTUNITY_RADAR_MIN_SCORE=70",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：机会雷达",
+                "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md#机会雷达",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "OPPORTUNITY_RADAR_TOP_N": {
+        "title": "Opportunity Radar Top N",
+        "description": "Maximum number of A-share/ETF candidates shown in the radar message.",
+        "category": "opportunity",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "6",
+        "options": [],
+        "validation": {"min": 1, "max": 50},
+        "display_order": 30,
+        "help_key": "settings.opportunity.limit",
+        "examples": [
+            "OPPORTUNITY_RADAR_TOP_N=6",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：机会雷达",
+                "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md#机会雷达",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "OPPORTUNITY_RADAR_FUND_TOP_N": {
+        "title": "Opportunity Radar Fund Top N",
+        "description": "Maximum number of off-exchange fund candidates shown. Set to 0 to skip fund NAV scoring.",
+        "category": "opportunity",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "4",
+        "options": [],
+        "validation": {"min": 0, "max": 50},
+        "display_order": 40,
+        "help_key": "settings.opportunity.funds",
+        "examples": [
+            "OPPORTUNITY_RADAR_FUND_TOP_N=4",
+            "OPPORTUNITY_RADAR_FUND_TOP_N=0",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：机会雷达",
+                "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md#机会雷达",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "OPPORTUNITY_FUND_LIST": {
+        "title": "Opportunity Fund List",
+        "description": "Off-exchange fund candidate pool, formatted as code:name pairs separated by commas.",
+        "category": "opportunity",
+        "data_type": "list",
+        "ui_control": "textarea",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {},
+        "display_order": 50,
+        "help_key": "settings.opportunity.funds",
+        "examples": [
+            "OPPORTUNITY_FUND_LIST=110011:易方达中小盘混合,003096:中欧医疗健康混合A",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：机会雷达",
+                "href": "https://github.com/ZhuLinsen/daily_stock_analysis/blob/main/docs/full-guide.md#机会雷达",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_MODE": {
         "title": "Agent Mode",
         "description": "Enable ReAct Agent for stock analysis.",
@@ -4524,6 +4658,8 @@ def _infer_category(key: str) -> str:
         return "base"
     if key.startswith("BACKTEST_"):
         return "backtest"
+    if key.startswith("OPPORTUNITY_"):
+        return "opportunity"
     if key.startswith(("GEMINI_", "OPENAI_", "ANTHROPIC_", "LITELLM_", "AIHUBMIX_", "DEEPSEEK_", "LLM_")):
         return "ai_model"
     if key.endswith("_PRIORITY") or key.startswith(
