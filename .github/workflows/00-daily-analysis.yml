@@ -277,7 +277,7 @@ jobs:
           MINIMAX_API_KEYS: ${{ vars.MINIMAX_API_KEYS || secrets.MINIMAX_API_KEYS }}
           BRAVE_API_KEYS: ${{ vars.BRAVE_API_KEYS || secrets.BRAVE_API_KEYS }}
           SEARXNG_BASE_URLS: ${{ vars.SEARXNG_BASE_URLS || secrets.SEARXNG_BASE_URLS }}
-          SEARXNG_PUBLIC_INSTANCES_ENABLED: ${{ vars.SEARXNG_PUBLIC_INSTANCES_ENABLED || secrets.SEARXNG_PUBLIC_INSTANCES_ENABLED }}
+          SEARXNG_PUBLIC_INSTANCES_ENABLED: ${{ vars.SEARXNG_PUBLIC_INSTANCES_ENABLED || secrets.SEARXNG_PUBLIC_INSTANCES_ENABLED || 'false' }}
           NEWS_ENABLED: ${{ vars.NEWS_ENABLED || secrets.NEWS_ENABLED || 'true' }}
           NEWS_LOOKBACK_HOURS: ${{ vars.NEWS_LOOKBACK_HOURS || secrets.NEWS_LOOKBACK_HOURS || '48' }}
           NEWS_MAX_ITEMS_PER_STOCK: ${{ vars.NEWS_MAX_ITEMS_PER_STOCK || secrets.NEWS_MAX_ITEMS_PER_STOCK || '8' }}
@@ -396,6 +396,7 @@ jobs:
           # 筹码分布：默认 false（云端接口不稳定）；需启用时在 Settings → Variables 添加 ENABLE_CHIP_DISTRIBUTION=true
           ENABLE_CHIP_DISTRIBUTION: ${{ vars.ENABLE_CHIP_DISTRIBUTION || secrets.ENABLE_CHIP_DISTRIBUTION || 'false' }}
           ENABLE_EASTMONEY_PATCH: ${{ vars.ENABLE_EASTMONEY_PATCH || secrets.ENABLE_EASTMONEY_PATCH || 'true' }}
+          EASTMONEY_AUTH_PATCH_ENABLED: ${{ vars.EASTMONEY_AUTH_PATCH_ENABLED || secrets.EASTMONEY_AUTH_PATCH_ENABLED || 'true' }}
           ENABLE_FUNDAMENTAL_PIPELINE: ${{ vars.ENABLE_FUNDAMENTAL_PIPELINE || secrets.ENABLE_FUNDAMENTAL_PIPELINE || 'true' }}
           FUNDAMENTAL_STAGE_TIMEOUT_SECONDS: ${{ vars.FUNDAMENTAL_STAGE_TIMEOUT_SECONDS || secrets.FUNDAMENTAL_STAGE_TIMEOUT_SECONDS || '12' }}
           FUNDAMENTAL_FETCH_TIMEOUT_SECONDS: ${{ vars.FUNDAMENTAL_FETCH_TIMEOUT_SECONDS || secrets.FUNDAMENTAL_FETCH_TIMEOUT_SECONDS || '5' }}
@@ -496,7 +497,7 @@ jobs:
               echo "  SearXNG Public Instances: ❌ 已禁用"
               ;;
             "")
-              echo "  SearXNG Public Instances: ✅ 默认开启"
+              echo "  SearXNG Public Instances: ❌ 默认关闭"
               ;;
             *)
               echo "  SearXNG Public Instances: ✅ 已启用"
@@ -504,6 +505,7 @@ jobs:
           esac
           echo "  筹码分布: $ENABLE_CHIP_DISTRIBUTION"
           echo "  东财补丁: $ENABLE_EASTMONEY_PATCH"
+          echo "  东财授权补丁: $EASTMONEY_AUTH_PATCH_ENABLED"
           echo "  基本面聚合: $ENABLE_FUNDAMENTAL_PIPELINE (${FUNDAMENTAL_STAGE_TIMEOUT_SECONDS}s)"
           echo ""
           echo "【通知渠道】"
