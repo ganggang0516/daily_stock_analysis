@@ -1,4 +1,5 @@
 import hashlib
+import os
 import random
 import secrets
 import threading
@@ -20,6 +21,7 @@ class AuthCache:
     def __init__(self):
         self.data = None
         self.expire_at = 0
+        self.failure_logged_at = 0
         self.lock = threading.Lock()
         self.ttl = 20
 
@@ -59,8 +61,14 @@ def _get_nid(user_agent):
     # 检查缓存是否有效，避免重复请求
     if _cache.data and now < _cache.expire_at:
         return _cache.data
+    if not _cache.data and now < _cache.expire_at:
+        return None
     # 使用线程锁确保并发安全
     with _cache.lock:
+        if _cache.data and now < _cache.expire_at:
+            return _cache.data
+        if not _cache.data and now < _cache.expire_at:
+            return None
         try:
             def generate_uuid_md5():
                 """
@@ -134,10 +142,25 @@ def _get_nid(user_agent):
             _cache.expire_at = now + _cache.ttl
             return nid
         except requests.exceptions.RequestException as e:
-            logger.warning(f"请求东方财富授权接口失败: {e}")
+            status_code = getattr(getattr(e, "response", None), "status_code", None)
             _cache.data = None
-            # 该接口请求失败时，方案可能已失效，后续大概率会继续失败，因无法成功获取，下次会继续请求，设置较长过期时间，可避免频繁请求
-            _cache.expire_at = now + 5 * 60
+            # 403 usually means Eastmoney changed/blocked the anonymous auth endpoint.
+            # Back off for longer and continue requests without nid18 instead of
+            # spamming the auth endpoint for every downstream quote request.
+            backoff_seconds = 30 * 60 if status_code == 403 else 5 * 60
+            _cache.expire_at = now + backoff_seconds
+            if now - _cache.failure_logged_at > 5 * 60:
+                log_message = (
+                    "东方财富授权接口返回 403，已临时跳过 nid18 授权补丁 %.0f 分钟；"
+                    "后续请求将继续使用原接口降级访问"
+                    if status_code == 403
+                    else "请求东方财富授权接口失败，已临时跳过 nid18 授权补丁 %.0f 分钟: %s"
+                )
+                if status_code == 403:
+                    logger.warning(log_message, backoff_seconds / 60)
+                else:
+                    logger.warning(log_message, backoff_seconds / 60, e)
+                _cache.failure_logged_at = now
             return None
         except (KeyError, json.JSONDecodeError) as e:
             logger.warning(f"解析东方财富授权接口响应失败: {e}")
@@ -149,6 +172,9 @@ def _get_nid(user_agent):
 
 def eastmoney_patch():
     if _patch_sign.is_patched():
+        return
+    if str(os.getenv("EASTMONEY_AUTH_PATCH_ENABLED", "true")).strip().lower() in {"0", "false", "no", "off"}:
+        logger.info("东方财富 nid18 授权补丁已通过 EASTMONEY_AUTH_PATCH_ENABLED=false 禁用")
         return
 
     def patched_request(self, method, url, **kwargs):
