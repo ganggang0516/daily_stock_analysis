@@ -83,6 +83,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - 新增机会雷达推送：每日分析后可额外筛选 A股/ETF 买点候选，并对配置的场外基金候选池做净值趋势、回撤和波动评分，输出候选理由、风险和买点/止损/止盈参考。
 - GitHub Actions 日报工作流补齐新闻时效、报告完整性、Markdown 转图、自动回测、实时行情、基本面缓存和组合风险阈值配置透传，并在启动日志中展示关键开关状态。
+- 为 `ganggang0516` Actions 场景增加默认自选股（高争民爆、新易盛）、默认场外基金候选 `008888` 和专用配置清单，减少首次运行前需要手动设置的变量。
 - 新增独立 `DecisionSignal` 存储、Repository、Service 与 `/api/v1/decision-signals` API，支持来源/市场/股票/动作/期限/阶段去重、查询、续期、状态更新、懒过期、持仓过滤和敏感信息脱敏。
 - 新增分析任务与历史报告运行流快照 API，提供 lanes、nodes、edges、events、summary 等统一契约，并从任务队列、运行诊断和 AnalysisContextPack overview 构建脱敏数据流/信息流。
 - Web 端为活跃任务、历史报告和大盘复盘报告补充运行流视图入口，支持查看运行摘要、拓扑节点、事件流和基础排障详情。

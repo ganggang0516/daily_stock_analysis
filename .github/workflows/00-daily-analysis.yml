@@ -375,7 +375,7 @@ jobs:
           # ==========================================
           # 自选股配置
           # ==========================================
-          STOCK_LIST: ${{ vars.STOCK_LIST || secrets.STOCK_LIST || '600519' }}
+          STOCK_LIST: ${{ vars.STOCK_LIST || secrets.STOCK_LIST || '002827,300502' }}
           MARKET_REVIEW_REGION: ${{ vars.MARKET_REVIEW_REGION || secrets.MARKET_REVIEW_REGION || 'cn' }}
           MARKET_REVIEW_COLOR_SCHEME: ${{ vars.MARKET_REVIEW_COLOR_SCHEME || secrets.MARKET_REVIEW_COLOR_SCHEME || 'green_up' }}
           
@@ -399,7 +399,7 @@ jobs:
           OPPORTUNITY_RADAR_MIN_SCORE: ${{ vars.OPPORTUNITY_RADAR_MIN_SCORE || secrets.OPPORTUNITY_RADAR_MIN_SCORE || '60' }}
           OPPORTUNITY_RADAR_TOP_N: ${{ vars.OPPORTUNITY_RADAR_TOP_N || secrets.OPPORTUNITY_RADAR_TOP_N || '6' }}
           OPPORTUNITY_RADAR_FUND_TOP_N: ${{ vars.OPPORTUNITY_RADAR_FUND_TOP_N || secrets.OPPORTUNITY_RADAR_FUND_TOP_N || '4' }}
-          OPPORTUNITY_FUND_LIST: ${{ vars.OPPORTUNITY_FUND_LIST || secrets.OPPORTUNITY_FUND_LIST }}
+          OPPORTUNITY_FUND_LIST: ${{ vars.OPPORTUNITY_FUND_LIST || secrets.OPPORTUNITY_FUND_LIST || '008888:场外基金008888:主动权益' }}
           MARKET_REVIEW_ENABLED: ${{ vars.MARKET_REVIEW_ENABLED || secrets.MARKET_REVIEW_ENABLED || 'true' }}
           DAILY_MARKET_CONTEXT_ENABLED: ${{ vars.DAILY_MARKET_CONTEXT_ENABLED || secrets.DAILY_MARKET_CONTEXT_ENABLED || 'true' }}
           ANALYSIS_DELAY: ${{ vars.ANALYSIS_DELAY || secrets.ANALYSIS_DELAY || '0' }}
