@@ -36,6 +36,7 @@ class OpportunityCandidate:
 class FundCandidateSpec:
     code: str
     name: str = ""
+    style: str = ""
 
 
 def parse_fund_candidate_specs(raw_items: Iterable[str]) -> List[FundCandidateSpec]:
@@ -46,17 +47,23 @@ def parse_fund_candidate_specs(raw_items: Iterable[str]) -> List[FundCandidateSp
         if not text:
             continue
         if ":" in text:
-            code, name = text.split(":", 1)
+            parts = [part.strip() for part in text.split(":", 2)]
+            code = parts[0] if parts else ""
+            name = parts[1] if len(parts) > 1 else ""
+            style = parts[2] if len(parts) > 2 else ""
         elif "|" in text:
-            code, name = text.split("|", 1)
+            parts = [part.strip() for part in text.split("|", 2)]
+            code = parts[0] if parts else ""
+            name = parts[1] if len(parts) > 1 else ""
+            style = parts[2] if len(parts) > 2 else ""
         else:
-            code, name = text, ""
+            code, name, style = text, "", ""
         code = code.strip()
         name = name.strip()
         if not code or code in seen:
             continue
         seen.add(code)
-        specs.append(FundCandidateSpec(code=code, name=name))
+        specs.append(FundCandidateSpec(code=code, name=name, style=style.strip()))
     return specs
 
 
@@ -262,12 +269,20 @@ def _score_open_fund(spec: FundCandidateSpec, ak: Any) -> OpportunityCandidate:
     ret60 = _window_return(nav, min(60, len(nav) - 1))
     drawdown = _max_drawdown(nav[-120:])
     volatility = _annualized_volatility(nav[-60:])
+    style = _normalize_fund_style(spec.style or spec.name)
     score = 60 + ret20 * 0.9 + ret60 * 0.35 - drawdown * 0.7 - volatility * 0.25
+    if style in {"债券", "货币"}:
+        score -= volatility * 0.15
+        score -= drawdown * 0.2
+    elif style in {"QDII", "海外"}:
+        score -= volatility * 0.1
     action = "重点跟踪" if score >= 72 and drawdown <= 15 else "定投观察" if score >= 60 else "等待"
     name = spec.name or spec.code
     reason = f"近20日 {ret20:+.1f}%，近60日 {ret60:+.1f}%，回撤 {drawdown:.1f}%"
-    risk = "回撤偏大，控制单笔投入。" if drawdown >= 15 else "基金适合分批/定投纪律，避免一次性追高。"
+    risk = _fund_risk_message(style, drawdown, volatility)
     tags = ["场外基金", "净值趋势"]
+    if style:
+        tags.append(style)
     if ret20 > 0 and ret60 > 0:
         tags.append("趋势向上")
     if drawdown <= 8:
@@ -351,6 +366,38 @@ def _near_buy_zone(price: Optional[float], ideal_buy: Optional[float]) -> bool:
 def _looks_like_fund_or_etf(code: str, name: str) -> bool:
     text = f"{code} {name}".lower()
     return any(token in text for token in ("etf", "lof", "基金", "指数"))
+
+
+def _normalize_fund_style(value: str) -> str:
+    text = str(value or "").strip().lower()
+    if not text:
+        return ""
+    style_aliases = (
+        ("QDII", ("qdii", "海外", "纳斯达克", "标普", "全球", "越南", "印度", "港股")),
+        ("指数", ("指数", "index", "沪深300", "中证", "创业板", "科创", "宽基")),
+        ("债券", ("债", "bond", "固收", "纯债", "二级债")),
+        ("货币", ("货币", "现金", "money")),
+        ("医药", ("医药", "医疗", "生物", "创新药")),
+        ("科技", ("科技", "芯片", "半导体", "ai", "人工智能", "数字")),
+        ("消费", ("消费", "白酒", "食品", "家电")),
+        ("主动权益", ("主动", "混合", "股票", "成长", "价值")),
+    )
+    for style, aliases in style_aliases:
+        if any(alias in text for alias in aliases):
+            return style
+    return str(value).strip()[:12]
+
+
+def _fund_risk_message(style: str, drawdown: float, volatility: float) -> str:
+    if drawdown >= 15:
+        return "回撤偏大，控制单笔投入，等趋势确认后再分批。"
+    if style in {"债券", "货币"}:
+        return "低波动品种更看重回撤和信用风险，异常波动时降低仓位。"
+    if style in {"QDII", "海外"}:
+        return "注意汇率、海外市场时差和溢价风险，适合分批观察。"
+    if volatility >= 28:
+        return "波动偏高，避免一次性追高，优先按定投或分批纪律执行。"
+    return "基金适合分批/定投纪律，避免一次性追高。"
 
 
 def _compact_reason(value: Any, max_length: int = 110) -> str:

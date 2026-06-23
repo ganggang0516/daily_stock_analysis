@@ -2,10 +2,12 @@
 """Unit tests for opportunity radar candidate selection."""
 
 from types import SimpleNamespace
+import sys
 import unittest
 
 from src.services.opportunity_radar import (
     OpportunityCandidate,
+    build_open_fund_candidates,
     build_stock_candidates,
     format_opportunity_radar_report,
     parse_fund_candidate_specs,
@@ -68,13 +70,52 @@ class OpportunityRadarTestCase(unittest.TestCase):
         specs = parse_fund_candidate_specs([
             "110011:易方达中小盘混合",
             "003096|中欧医疗健康混合A",
+            "008888:示例主动基金:主动权益",
             "110011:重复",
             "  ",
         ])
 
-        self.assertEqual([item.code for item in specs], ["110011", "003096"])
+        self.assertEqual([item.code for item in specs], ["110011", "003096", "008888"])
         self.assertEqual(specs[0].name, "易方达中小盘混合")
         self.assertEqual(specs[1].name, "中欧医疗健康混合A")
+        self.assertEqual(specs[2].style, "主动权益")
+
+    def test_open_fund_candidate_scores_with_fake_nav_data(self):
+        class FakeFundFrame:
+            columns = ["净值日期", "单位净值"]
+
+            def __len__(self):
+                return 80
+
+            def __getitem__(self, key):
+                if key == "单位净值":
+                    return [1.0 + index * 0.002 for index in range(80)]
+                raise KeyError(key)
+
+        class FakeAkShare:
+            @staticmethod
+            def fund_open_fund_info_em(symbol, indicator):
+                self.assertEqual(symbol, "008888")
+                self.assertEqual(indicator, "单位净值走势")
+                return FakeFundFrame()
+
+        old_akshare = sys.modules.get("akshare")
+        sys.modules["akshare"] = FakeAkShare
+        try:
+            candidates = build_open_fund_candidates(
+                parse_fund_candidate_specs(["008888:示例主动基金:主动权益"]),
+                top_n=1,
+            )
+        finally:
+            if old_akshare is None:
+                sys.modules.pop("akshare", None)
+            else:
+                sys.modules["akshare"] = old_akshare
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(candidates[0].code, "008888")
+        self.assertIn("主动权益", candidates[0].tags)
+        self.assertIn(candidates[0].action, {"重点跟踪", "定投观察", "等待"})
 
     def test_report_contains_disclaimer_and_fund_section(self):
         report = format_opportunity_radar_report(
