@@ -32,6 +32,11 @@ on:
         required: false
         default: false
         type: boolean
+      intraday_alert_test:
+        description: '盘中买卖点提醒测试（仅自选股；无信号也推送状态）'
+        required: false
+        default: false
+        type: boolean
 
 # 并发控制：同一时间只运行一个分析任务
 concurrency:
@@ -378,6 +383,7 @@ jobs:
           SINGLE_STOCK_NOTIFY: ${{ vars.SINGLE_STOCK_NOTIFY || secrets.SINGLE_STOCK_NOTIFY || 'false' }}
           INTRADAY_SIGNAL_ALERT_ONLY: ${{ vars.INTRADAY_SIGNAL_ALERT_ONLY || secrets.INTRADAY_SIGNAL_ALERT_ONLY || 'false' }}
           INTRADAY_BUY_SIGNAL_MIN_SCORE: ${{ vars.INTRADAY_BUY_SIGNAL_MIN_SCORE || secrets.INTRADAY_BUY_SIGNAL_MIN_SCORE || '60' }}
+          INTRADAY_SIGNAL_SEND_EMPTY: ${{ vars.INTRADAY_SIGNAL_SEND_EMPTY || secrets.INTRADAY_SIGNAL_SEND_EMPTY || 'true' }}
           MARKET_REVIEW_ENABLED: ${{ vars.MARKET_REVIEW_ENABLED || secrets.MARKET_REVIEW_ENABLED || 'true' }}
           ANALYSIS_DELAY: ${{ vars.ANALYSIS_DELAY || secrets.ANALYSIS_DELAY || '0' }}
           TRADING_DAY_CHECK_ENABLED: ${{ vars.TRADING_DAY_CHECK_ENABLED || secrets.TRADING_DAY_CHECK_ENABLED || 'true' }}
@@ -426,6 +432,12 @@ jobs:
                 ;;
             esac
           fi
+          if [ "${{ github.event.inputs.intraday_alert_test || 'false' }}" = "true" ]; then
+            MODE="stocks-only"
+            export INTRADAY_SIGNAL_ALERT_ONLY="true"
+            export INTRADAY_SIGNAL_SEND_EMPTY="true"
+            echo "🧪 手动盘中买卖点提醒测试：仅运行自选股，无候选也推送状态"
+          fi
           
           echo "=========================================="
           echo "🚀 A股自选股智能分析系统"
@@ -435,6 +447,7 @@ jobs:
           echo "📊 自选股: $STOCK_LIST"
           echo "📝 报告类型: $REPORT_TYPE"
           echo "🔔 盘中信号提醒: $INTRADAY_SIGNAL_ALERT_ONLY"
+          echo "📭 无信号状态推送: $INTRADAY_SIGNAL_SEND_EMPTY"
           echo "🎯 买点提醒最低评分: $INTRADAY_BUY_SIGNAL_MIN_SCORE"
           echo ""
           echo "=========================================="

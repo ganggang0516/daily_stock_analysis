@@ -180,6 +180,34 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
         _, kwargs = pipeline._send_notifications.call_args
         self.assertTrue(kwargs["skip_push"])
 
+    def test_intraday_signal_alert_sends_empty_status_by_default(self):
+        pipeline = self._build_batch_pipeline()
+        pipeline._send_intraday_signal_alerts([
+            _make_result("000001", operation_advice="持有观察", decision_type="hold", sentiment_score=50),
+            _make_result("600519", operation_advice="等待回踩", decision_type="hold", sentiment_score=58),
+        ])
+
+        self.assertEqual(len(pipeline.notifier.sent_reports), 1)
+        self.assertIn("本轮未发现满足条件的买点/卖点候选", pipeline.notifier.sent_reports[0])
+        self.assertIn("000001", pipeline.notifier.sent_reports[0])
+        self.assertEqual(pipeline.notifier.route_types, ["alert"])
+
+    def test_intraday_signal_alert_can_skip_empty_status(self):
+        pipeline = self._build_batch_pipeline()
+        old_value = os.environ.get("INTRADAY_SIGNAL_SEND_EMPTY")
+        os.environ["INTRADAY_SIGNAL_SEND_EMPTY"] = "false"
+        try:
+            pipeline._send_intraday_signal_alerts([
+                _make_result("000001", operation_advice="持有观察", decision_type="hold", sentiment_score=50),
+            ])
+        finally:
+            if old_value is None:
+                os.environ.pop("INTRADAY_SIGNAL_SEND_EMPTY", None)
+            else:
+                os.environ["INTRADAY_SIGNAL_SEND_EMPTY"] = old_value
+
+        self.assertEqual(pipeline.notifier.sent_reports, [])
+
     def test_run_deduplicates_normalized_stock_codes_before_analysis(self):
         pipeline = self._build_batch_pipeline()
         pipeline.config.single_stock_notify = False
