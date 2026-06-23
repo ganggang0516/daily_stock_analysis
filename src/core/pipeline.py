@@ -3180,6 +3180,8 @@ class StockAnalysisPipeline:
             logger.warning("盘中信号提醒跳过：未配置有效通知渠道")
             return
 
+        now_cn = datetime.now(timezone(timedelta(hours=8)))
+        min_buy_score = self._env_int("INTRADAY_BUY_SIGNAL_MIN_SCORE", 60)
         candidates: List[Tuple[str, AnalysisResult]] = []
         for result in results:
             signal = self._classify_intraday_signal(result)
@@ -3187,7 +3189,42 @@ class StockAnalysisPipeline:
                 candidates.append((signal, result))
 
         if not candidates:
-            logger.info("盘中信号提醒：本轮未发现买点/卖点候选，不发送 alert")
+            if not self._env_flag_enabled("INTRADAY_SIGNAL_SEND_EMPTY", "true"):
+                logger.info("盘中信号提醒：本轮未发现买点/卖点候选，不发送 alert")
+                return
+
+            tracked = ", ".join(
+                (
+                    f"{getattr(result, 'name', '') or getattr(result, 'code', '')}"
+                    f"({getattr(result, 'code', '')})"
+                )
+                for result in results[:20]
+            )
+            lines = [
+                "# 盘中买卖点提醒",
+                "",
+                f"时间: {now_cn.strftime('%Y-%m-%d %H:%M')} 北京时间",
+                f"买点最低评分: {min_buy_score}",
+                "",
+                "本轮未发现满足条件的买点/卖点候选。",
+            ]
+            if tracked:
+                lines.extend(["", f"已检查: {tracked}"])
+            lines.extend([
+                "",
+                "提示: 这表示任务已经运行，当前只是不满足推送阈值；如需更敏感可调低 INTRADAY_BUY_SIGNAL_MIN_SCORE。",
+            ])
+            sent = self.notifier.send(
+                "\n".join(lines),
+                route_type="alert",
+                severity="info",
+                dedup_key=f"intraday-signal-empty:{now_cn.strftime('%Y%m%d%H%M')}",
+                cooldown_key="intraday-signal-empty",
+            )
+            if sent:
+                logger.info("盘中买卖点状态提醒已发送：本轮无候选")
+            else:
+                logger.warning("盘中买卖点状态提醒发送失败：本轮无候选")
             return
 
         candidates.sort(
@@ -3197,8 +3234,6 @@ class StockAnalysisPipeline:
                 str(getattr(item[1], "code", "") or ""),
             )
         )
-        now_cn = datetime.now(timezone(timedelta(hours=8)))
-        min_buy_score = self._env_int("INTRADAY_BUY_SIGNAL_MIN_SCORE", 60)
         lines = [
             "# 盘中买卖点提醒",
             "",
