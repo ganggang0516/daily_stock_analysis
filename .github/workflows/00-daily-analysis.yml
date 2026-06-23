@@ -284,6 +284,11 @@ jobs:
           NEWS_MAX_ITEMS_MARKET: ${{ vars.NEWS_MAX_ITEMS_MARKET || secrets.NEWS_MAX_ITEMS_MARKET || '12' }}
           NEWS_REQUIRE_SOURCE: ${{ vars.NEWS_REQUIRE_SOURCE || secrets.NEWS_REQUIRE_SOURCE || 'true' }}
           NEWS_DEDUP_ENABLED: ${{ vars.NEWS_DEDUP_ENABLED || secrets.NEWS_DEDUP_ENABLED || 'true' }}
+          NEWS_MAX_AGE_DAYS: ${{ vars.NEWS_MAX_AGE_DAYS || secrets.NEWS_MAX_AGE_DAYS || '3' }}
+          NEWS_STRATEGY_PROFILE: ${{ vars.NEWS_STRATEGY_PROFILE || secrets.NEWS_STRATEGY_PROFILE || 'short' }}
+          NEWS_INTEL_RETENTION_DAYS: ${{ vars.NEWS_INTEL_RETENTION_DAYS || secrets.NEWS_INTEL_RETENTION_DAYS || '30' }}
+          NEWS_INTEL_FETCH_TIMEOUT_SEC: ${{ vars.NEWS_INTEL_FETCH_TIMEOUT_SEC || secrets.NEWS_INTEL_FETCH_TIMEOUT_SEC || '8' }}
+          NEWS_INTEL_MAX_ITEMS_PER_SOURCE: ${{ vars.NEWS_INTEL_MAX_ITEMS_PER_SOURCE || secrets.NEWS_INTEL_MAX_ITEMS_PER_SOURCE || '50' }}
           
           # ==========================================
           # 通知渠道（可同时配置多个，全部推送）
@@ -380,7 +385,13 @@ jobs:
           REPORT_TYPE: ${{ vars.REPORT_TYPE || secrets.REPORT_TYPE || 'simple' }}
           REPORT_LANGUAGE: ${{ vars.REPORT_LANGUAGE || secrets.REPORT_LANGUAGE || '' }}
           REPORT_SHOW_LLM_MODEL: ${{ vars.REPORT_SHOW_LLM_MODEL || secrets.REPORT_SHOW_LLM_MODEL || 'true' }}
+          REPORT_INTEGRITY_ENABLED: ${{ vars.REPORT_INTEGRITY_ENABLED || secrets.REPORT_INTEGRITY_ENABLED || 'true' }}
+          REPORT_INTEGRITY_RETRY: ${{ vars.REPORT_INTEGRITY_RETRY || secrets.REPORT_INTEGRITY_RETRY || '1' }}
+          REPORT_HISTORY_COMPARE_N: ${{ vars.REPORT_HISTORY_COMPARE_N || secrets.REPORT_HISTORY_COMPARE_N || '0' }}
           SINGLE_STOCK_NOTIFY: ${{ vars.SINGLE_STOCK_NOTIFY || secrets.SINGLE_STOCK_NOTIFY || 'false' }}
+          MERGE_EMAIL_NOTIFICATION: ${{ vars.MERGE_EMAIL_NOTIFICATION || secrets.MERGE_EMAIL_NOTIFICATION || 'false' }}
+          MARKDOWN_TO_IMAGE_CHANNELS: ${{ vars.MARKDOWN_TO_IMAGE_CHANNELS || secrets.MARKDOWN_TO_IMAGE_CHANNELS }}
+          MARKDOWN_TO_IMAGE_MAX_CHARS: ${{ vars.MARKDOWN_TO_IMAGE_MAX_CHARS || secrets.MARKDOWN_TO_IMAGE_MAX_CHARS || '15000' }}
           INTRADAY_SIGNAL_ALERT_ONLY: ${{ vars.INTRADAY_SIGNAL_ALERT_ONLY || secrets.INTRADAY_SIGNAL_ALERT_ONLY || 'false' }}
           INTRADAY_BUY_SIGNAL_MIN_SCORE: ${{ vars.INTRADAY_BUY_SIGNAL_MIN_SCORE || secrets.INTRADAY_BUY_SIGNAL_MIN_SCORE || '60' }}
           INTRADAY_SIGNAL_SEND_EMPTY: ${{ vars.INTRADAY_SIGNAL_SEND_EMPTY || secrets.INTRADAY_SIGNAL_SEND_EMPTY || 'true' }}
@@ -390,14 +401,23 @@ jobs:
           OPPORTUNITY_RADAR_FUND_TOP_N: ${{ vars.OPPORTUNITY_RADAR_FUND_TOP_N || secrets.OPPORTUNITY_RADAR_FUND_TOP_N || '4' }}
           OPPORTUNITY_FUND_LIST: ${{ vars.OPPORTUNITY_FUND_LIST || secrets.OPPORTUNITY_FUND_LIST }}
           MARKET_REVIEW_ENABLED: ${{ vars.MARKET_REVIEW_ENABLED || secrets.MARKET_REVIEW_ENABLED || 'true' }}
+          DAILY_MARKET_CONTEXT_ENABLED: ${{ vars.DAILY_MARKET_CONTEXT_ENABLED || secrets.DAILY_MARKET_CONTEXT_ENABLED || 'true' }}
           ANALYSIS_DELAY: ${{ vars.ANALYSIS_DELAY || secrets.ANALYSIS_DELAY || '0' }}
           TRADING_DAY_CHECK_ENABLED: ${{ vars.TRADING_DAY_CHECK_ENABLED || secrets.TRADING_DAY_CHECK_ENABLED || 'true' }}
+          BACKTEST_ENABLED: ${{ vars.BACKTEST_ENABLED || secrets.BACKTEST_ENABLED || 'true' }}
+          BACKTEST_EVAL_WINDOW_DAYS: ${{ vars.BACKTEST_EVAL_WINDOW_DAYS || secrets.BACKTEST_EVAL_WINDOW_DAYS || '10' }}
+          BACKTEST_MIN_AGE_DAYS: ${{ vars.BACKTEST_MIN_AGE_DAYS || secrets.BACKTEST_MIN_AGE_DAYS || '14' }}
+          BACKTEST_ENGINE_VERSION: ${{ vars.BACKTEST_ENGINE_VERSION || secrets.BACKTEST_ENGINE_VERSION || 'v1' }}
+          BACKTEST_NEUTRAL_BAND_PCT: ${{ vars.BACKTEST_NEUTRAL_BAND_PCT || secrets.BACKTEST_NEUTRAL_BAND_PCT || '2.0' }}
           
           # ==========================================
           # 系统配置
           # ==========================================
           LOG_LEVEL: INFO
           MAX_WORKERS: ${{ vars.MAX_WORKERS || secrets.MAX_WORKERS || '1' }}
+          PREFETCH_REALTIME_QUOTES: ${{ vars.PREFETCH_REALTIME_QUOTES || secrets.PREFETCH_REALTIME_QUOTES || 'true' }}
+          ENABLE_REALTIME_QUOTE: ${{ vars.ENABLE_REALTIME_QUOTE || secrets.ENABLE_REALTIME_QUOTE || 'true' }}
+          ENABLE_REALTIME_TECHNICAL_INDICATORS: ${{ vars.ENABLE_REALTIME_TECHNICAL_INDICATORS || secrets.ENABLE_REALTIME_TECHNICAL_INDICATORS || 'true' }}
           # 筹码分布：默认 false（云端接口不稳定）；需启用时在 Settings → Variables 添加 ENABLE_CHIP_DISTRIBUTION=true
           ENABLE_CHIP_DISTRIBUTION: ${{ vars.ENABLE_CHIP_DISTRIBUTION || secrets.ENABLE_CHIP_DISTRIBUTION || 'false' }}
           ENABLE_EASTMONEY_PATCH: ${{ vars.ENABLE_EASTMONEY_PATCH || secrets.ENABLE_EASTMONEY_PATCH || 'true' }}
@@ -406,6 +426,13 @@ jobs:
           FUNDAMENTAL_STAGE_TIMEOUT_SECONDS: ${{ vars.FUNDAMENTAL_STAGE_TIMEOUT_SECONDS || secrets.FUNDAMENTAL_STAGE_TIMEOUT_SECONDS || '12' }}
           FUNDAMENTAL_FETCH_TIMEOUT_SECONDS: ${{ vars.FUNDAMENTAL_FETCH_TIMEOUT_SECONDS || secrets.FUNDAMENTAL_FETCH_TIMEOUT_SECONDS || '5' }}
           FUNDAMENTAL_RETRY_MAX: ${{ vars.FUNDAMENTAL_RETRY_MAX || secrets.FUNDAMENTAL_RETRY_MAX || '1' }}
+          FUNDAMENTAL_CACHE_TTL_SECONDS: ${{ vars.FUNDAMENTAL_CACHE_TTL_SECONDS || secrets.FUNDAMENTAL_CACHE_TTL_SECONDS || '180' }}
+          FUNDAMENTAL_CACHE_MAX_ENTRIES: ${{ vars.FUNDAMENTAL_CACHE_MAX_ENTRIES || secrets.FUNDAMENTAL_CACHE_MAX_ENTRIES || '512' }}
+          PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT: ${{ vars.PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT || secrets.PORTFOLIO_RISK_CONCENTRATION_ALERT_PCT || '35' }}
+          PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT: ${{ vars.PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT || secrets.PORTFOLIO_RISK_DRAWDOWN_ALERT_PCT || '15' }}
+          PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT: ${{ vars.PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT || secrets.PORTFOLIO_RISK_STOP_LOSS_ALERT_PCT || '10' }}
+          PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO: ${{ vars.PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO || secrets.PORTFOLIO_RISK_STOP_LOSS_NEAR_RATIO || '0.8' }}
+          PORTFOLIO_RISK_LOOKBACK_DAYS: ${{ vars.PORTFOLIO_RISK_LOOKBACK_DAYS || secrets.PORTFOLIO_RISK_LOOKBACK_DAYS || '180' }}
           # 实时行情数据源优先级（腾讯有量比且稳定，推荐首选）
           # 可选值: tencent, akshare_sina, efinance, akshare_em, tushare
           # 如果有 Tushare Pro 高积分账号，可将 tushare 放在首位
@@ -452,11 +479,13 @@ jobs:
           echo "🎯 运行模式: $MODE"
           echo "📊 自选股: $STOCK_LIST"
           echo "📝 报告类型: $REPORT_TYPE"
+          echo "🧪 报告完整性: $REPORT_INTEGRITY_ENABLED (retry=$REPORT_INTEGRITY_RETRY)"
           echo "🔔 盘中信号提醒: $INTRADAY_SIGNAL_ALERT_ONLY"
           echo "📭 无信号状态推送: $INTRADAY_SIGNAL_SEND_EMPTY"
           echo "🎯 买点提醒最低评分: $INTRADAY_BUY_SIGNAL_MIN_SCORE"
           echo "🧭 机会雷达: $OPPORTUNITY_RADAR_ENABLED (min=$OPPORTUNITY_RADAR_MIN_SCORE, top=$OPPORTUNITY_RADAR_TOP_N)"
           echo "🧺 场外基金候选: $([ -n "$OPPORTUNITY_FUND_LIST" ] && echo '✅ 已配置' || echo '⚪ 未配置')"
+          echo "🔁 自动回测: $BACKTEST_ENABLED (${BACKTEST_EVAL_WINDOW_DAYS}d/${BACKTEST_MIN_AGE_DAYS}d)"
           echo ""
           echo "=========================================="
           echo "📋 配置检查"
@@ -490,7 +519,7 @@ jobs:
               echo "  新闻增强: ❌ 已关闭"
               ;;
             *)
-              echo "  新闻增强: ✅ 已开启（lookback=${NEWS_LOOKBACK_HOURS}h, stock_items=${NEWS_MAX_ITEMS_PER_STOCK}）"
+              echo "  新闻增强: ✅ 已开启（profile=${NEWS_STRATEGY_PROFILE}, max_age=${NEWS_MAX_AGE_DAYS}d, lookback=${NEWS_LOOKBACK_HOURS}h, stock_items=${NEWS_MAX_ITEMS_PER_STOCK}）"
               ;;
           esac
           echo "  Bocha API Keys: $([ -n "$BOCHA_API_KEYS" ] && echo '✅ 已配置' || echo '⚪ 未配置')"
@@ -513,7 +542,8 @@ jobs:
           echo "  筹码分布: $ENABLE_CHIP_DISTRIBUTION"
           echo "  东财补丁: $ENABLE_EASTMONEY_PATCH"
           echo "  东财授权补丁: $EASTMONEY_AUTH_PATCH_ENABLED"
-          echo "  基本面聚合: $ENABLE_FUNDAMENTAL_PIPELINE (${FUNDAMENTAL_STAGE_TIMEOUT_SECONDS}s)"
+          echo "  实时行情: quote=$ENABLE_REALTIME_QUOTE technical=$ENABLE_REALTIME_TECHNICAL_INDICATORS prefetch=$PREFETCH_REALTIME_QUOTES"
+          echo "  基本面聚合: $ENABLE_FUNDAMENTAL_PIPELINE (${FUNDAMENTAL_STAGE_TIMEOUT_SECONDS}s, cache=${FUNDAMENTAL_CACHE_TTL_SECONDS}s/${FUNDAMENTAL_CACHE_MAX_ENTRIES})"
           echo "  机会雷达: $OPPORTUNITY_RADAR_ENABLED"
           echo ""
           echo "【通知渠道】"
