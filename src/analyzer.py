@@ -246,6 +246,23 @@ class _AllModelsFailedError(Exception):
         self.last_usage = last_usage or {}
 
 
+_LLM_QUOTA_OR_RATE_LIMIT_MARKERS = (
+    "resource_exhausted",
+    "quotafailure",
+    "generaterequestsperdayperprojectpermodel",
+    "quota",
+    "rate limit",
+    "ratelimit",
+    "429",
+    "too many requests",
+)
+
+
+def _is_llm_quota_or_rate_limit_error(error: Any) -> bool:
+    text = str(error or "").lower()
+    return any(marker in text for marker in _LLM_QUOTA_OR_RATE_LIMIT_MARKERS)
+
+
 def check_content_integrity(
     result: "AnalysisResult",
     *,
@@ -2857,6 +2874,14 @@ class GeminiAnalyzer:
                             progress_callback=stream_progress_callback,
                         )
                     except _LiteLLMStreamError as exc:
+                        last_error = exc
+                        if _is_llm_quota_or_rate_limit_error(exc):
+                            logger.warning(
+                                "[LiteLLM] %s stream hit quota/rate limit, skipping same-model non-stream fallback: %s",
+                                model,
+                                exc,
+                            )
+                            continue
                         if exc.partial_received:
                             logger.warning(
                                 "[LiteLLM] %s stream failed after partial output, retrying non-stream for same model: %s",
@@ -2869,8 +2894,15 @@ class GeminiAnalyzer:
                                 model,
                                 exc,
                             )
-                        last_error = exc
                     except Exception as exc:
+                        last_error = exc
+                        if _is_llm_quota_or_rate_limit_error(exc):
+                            logger.warning(
+                                "[LiteLLM] %s stream request hit quota/rate limit, skipping same-model non-stream fallback: %s",
+                                model,
+                                exc,
+                            )
+                            continue
                         logger.warning(
                             "[LiteLLM] %s stream request failed before first chunk, falling back to non-stream: %s",
                             model,
@@ -2964,6 +2996,166 @@ class GeminiAnalyzer:
         except Exception as exc:
             logger.error("[generate_text] LLM call failed: %s", exc)
             return None
+
+    def _build_quota_fallback_result(
+        self,
+        *,
+        context: Dict[str, Any],
+        code: str,
+        name: str,
+        report_language: str,
+        error: Exception,
+        news_context: Optional[str] = None,
+    ) -> AnalysisResult:
+        """Build a conservative report item when LLM quota/rate limit is exhausted."""
+        today = context.get("today") or {}
+        realtime = context.get("realtime") or {}
+        trend = context.get("trend_analysis") or {}
+        if not isinstance(trend, dict):
+            trend = {}
+
+        def _num(value: Any) -> Optional[float]:
+            try:
+                if value is None or value == "":
+                    return None
+                return float(value)
+            except (TypeError, ValueError):
+                return None
+
+        current_price = _num(realtime.get("price")) or _num(today.get("close"))
+        change_pct = _num(realtime.get("change_pct"))
+        if change_pct is None:
+            change_pct = _num(realtime.get("pct_chg")) or _num(today.get("pct_chg"))
+
+        ma_alignment = str(trend.get("ma_alignment") or "N/A")
+        trend_status = str(trend.get("trend_status") or "N/A")
+        volume_status = str(trend.get("volume_status") or "N/A")
+        signal_score = trend.get("signal_score")
+        try:
+            fallback_score = int(signal_score)
+        except (TypeError, ValueError):
+            fallback_score = 50
+        fallback_score = max(0, min(100, fallback_score))
+
+        support_levels = trend.get("support_levels") or []
+        resistance_levels = trend.get("resistance_levels") or []
+        support = support_levels[0] if support_levels else "N/A"
+        resistance = resistance_levels[0] if resistance_levels else "N/A"
+        risk_factors = trend.get("risk_factors") or []
+        if not isinstance(risk_factors, list):
+            risk_factors = [str(risk_factors)]
+        risk_alerts = [str(item) for item in risk_factors if str(item).strip()]
+        quota_message = (
+            "AI quota/rate limit was reached; this item uses deterministic market data only."
+            if report_language == "en"
+            else "AI 模型配额/限流已触发，本条使用行情与技术指标生成降级观察。"
+        )
+        if not risk_alerts:
+            risk_alerts = [
+                "Do not treat this fallback item as an AI-confirmed trading signal."
+                if report_language == "en"
+                else "降级结果未经过 AI 深度推理，不作为买卖信号。"
+            ]
+
+        if report_language == "en":
+            trend_prediction = "Sideways"
+            operation_advice = "Watch"
+            confidence_level = "Low"
+            analysis_summary = (
+                f"{quota_message} Price {current_price if current_price is not None else 'N/A'}, "
+                f"change {change_pct if change_pct is not None else 'N/A'}%, "
+                f"trend {trend_status}, MA alignment {ma_alignment}."
+            )
+            risk_warning = "; ".join(risk_alerts)
+            key_points = (
+                f"Fallback score: {fallback_score}; support: {support}; "
+                f"resistance: {resistance}; volume: {volume_status}."
+            )
+            battle_note = "Wait for the next complete AI run before taking new action."
+        else:
+            trend_prediction = "震荡"
+            operation_advice = "观望"
+            confidence_level = "低"
+            analysis_summary = (
+                f"{quota_message} 当前价 {current_price if current_price is not None else 'N/A'}，"
+                f"涨跌幅 {change_pct if change_pct is not None else 'N/A'}%，"
+                f"趋势状态 {trend_status}，均线结构 {ma_alignment}。"
+            )
+            risk_warning = "；".join(risk_alerts)
+            key_points = (
+                f"降级评分: {fallback_score}；支撑: {support}；"
+                f"压力: {resistance}；量能: {volume_status}。"
+            )
+            battle_note = "等待下一次完整 AI 日报恢复后再做新增动作。"
+
+        dashboard = {
+            "core_conclusion": {
+                "one_sentence": analysis_summary,
+                "position_advice": {
+                    "action": operation_advice,
+                    "reason": quota_message,
+                },
+            },
+            "data_perspective": {
+                "price_position": {
+                    "current_price": current_price,
+                    "ma5": trend.get("ma5"),
+                    "ma10": trend.get("ma10"),
+                    "ma20": trend.get("ma20"),
+                    "bias_ma5": trend.get("bias_ma5"),
+                    "support_level": support,
+                    "resistance_level": resistance,
+                },
+                "volume_analysis": {
+                    "volume_status": volume_status,
+                    "volume_trend": trend.get("volume_trend") or "N/A",
+                },
+                "chip_structure": {},
+                "chip_unavailable_reason": get_chip_unavailable_text(report_language),
+            },
+            "battle_plan": {
+                "sniper_points": {
+                    "entry": "N/A",
+                    "stop_loss": support,
+                    "take_profit": resistance,
+                },
+                "position_strategy": battle_note,
+                "action_checklist": [battle_note],
+            },
+            "intelligence": {
+                "latest_news": _extract_intel_section_from_text(news_context, "最新消息") or "",
+                "risk_alerts": risk_alerts,
+            },
+        }
+
+        result = AnalysisResult(
+            code=code,
+            name=name,
+            sentiment_score=fallback_score,
+            trend_prediction=trend_prediction,
+            operation_advice=operation_advice,
+            decision_type="hold",
+            confidence_level=confidence_level,
+            report_language=report_language,
+            dashboard=dashboard,
+            trend_analysis=key_points,
+            technical_analysis=key_points,
+            volume_analysis=str(volume_status),
+            analysis_summary=analysis_summary,
+            key_points=key_points,
+            risk_warning=risk_warning,
+            buy_reason=quota_message,
+            market_snapshot=self._build_market_snapshot(context),
+            search_performed=bool(news_context),
+            success=True,
+            error_message=f"LLM quota/rate limit fallback: {str(error)[:200]}",
+            current_price=current_price,
+            change_pct=change_pct,
+            model_used="fallback:llm_quota_or_rate_limit",
+        )
+        normalize_chip_structure_availability(result, context.get("chip"))
+        populate_decision_action_fields(result)
+        return result
 
     def analyze(
         self, 
@@ -3189,6 +3381,21 @@ class GeminiAnalyzer:
             return result
             
         except Exception as e:
+            if _is_llm_quota_or_rate_limit_error(e):
+                logger.warning(
+                    "AI 分析 %s(%s) 触发配额/限流，使用数据驱动降级结果进入日报: %s",
+                    name,
+                    code,
+                    e,
+                )
+                return self._build_quota_fallback_result(
+                    context=context,
+                    code=code,
+                    name=name,
+                    report_language=report_language,
+                    error=e,
+                    news_context=news_context,
+                )
             logger.error(f"AI 分析 {name}({code}) 失败: {e}")
             return AnalysisResult(
                 code=code,

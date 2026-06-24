@@ -24,7 +24,6 @@ from typing import Callable, Optional, List, Tuple, Dict, Any
 
 import pandas as pd
 import numpy as np
-from src.data.fund_mapping import get_fund_name
 from src.data.stock_index_loader import get_index_stock_name
 from src.data.stock_mapping import STOCK_NAME_MAP, is_meaningful_stock_name
 from src.services.run_diagnostics import record_provider_run, record_provider_run_started
@@ -2173,10 +2172,6 @@ class DataFetcherManager:
         if is_meaningful_stock_name(index_name, stock_code):
             return self._cache_stock_name(stock_code, index_name) or index_name
 
-        fund_name = get_fund_name(stock_code, allow_network=False)
-        if is_meaningful_stock_name(fund_name, stock_code):
-            return self._cache_stock_name(stock_code, fund_name) or fund_name
-
         # 2. 尝试从实时行情中获取（最快，可按需禁用）
         if allow_realtime:
             quote = self.get_realtime_quote(raw_stock_code or stock_code, log_final_failure=False)
@@ -2185,12 +2180,6 @@ class DataFetcherManager:
                 self._cache_stock_name(stock_code, name)
                 logger.info(f"[股票名称] 从实时行情获取: {stock_code} -> {name}")
                 return name
-
-            fund_name = get_fund_name(stock_code, allow_network=True)
-            if is_meaningful_stock_name(fund_name, stock_code):
-                self._cache_stock_name(stock_code, fund_name)
-                logger.info(f"[基金名称] 从 AkShare 获取: {stock_code} -> {fund_name}")
-                return fund_name
 
         # 3. 依次尝试各个数据源
         from .akshare_fetcher import _is_us_code

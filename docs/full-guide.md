@@ -1386,28 +1386,6 @@ P5 在 Web `/decision-signals` 页面筛选区下方展示当前 outcome engine 
 
 回测在每日分析流程完成后自动触发（非阻塞，失败不影响通知推送）。也可通过 API 手动触发。
 
-## 机会雷达
-
-机会雷达会在每日个股分析完成后额外推送一条候选清单，用已有个股分析结果筛选 A股/ETF 买点观察池，并可对你配置的场外基金候选池做净值趋势、回撤和波动评分。它用于提高筛选和风控效率，不构成收益承诺或下单指令。
-
-| 变量 | 默认值 | 说明 |
-|------|--------|------|
-| `OPPORTUNITY_RADAR_ENABLED` | `false` | 是否启用机会雷达推送；GitHub Actions 工作流默认透传为 `true`，可用变量覆盖 |
-| `OPPORTUNITY_RADAR_MIN_SCORE` | `60` | A股/ETF 入选最低雷达分 |
-| `OPPORTUNITY_RADAR_TOP_N` | `6` | A股/ETF 最多展示数量 |
-| `OPPORTUNITY_RADAR_FUND_TOP_N` | `4` | 场外基金最多展示数量；设为 `0` 可跳过基金净值评分 |
-| `OPPORTUNITY_FUND_LIST` | 空 | 场外基金候选池，格式 `基金代码:名称[:风格]`，多个用英文逗号分隔；风格可写 `主动权益/指数/债券/QDII/医药/科技/消费` 等 |
-
-示例：
-
-```env
-OPPORTUNITY_RADAR_ENABLED=true
-OPPORTUNITY_RADAR_MIN_SCORE=60
-OPPORTUNITY_RADAR_TOP_N=6
-OPPORTUNITY_RADAR_FUND_TOP_N=4
-OPPORTUNITY_FUND_LIST=008888:示例主动基金:主动权益,110011:易方达中小盘混合:主动权益,003096:中欧医疗健康混合A:医药
-```
-
 ### 评估指标
 
 | 指标 | 说明 |
