@@ -3086,7 +3086,9 @@ class StockAnalysisPipeline:
         return str(value or "").strip().lower() not in {"", "0", "false", "no", "off"}
 
     def _is_intraday_signal_alert_only(self) -> bool:
-        return self._env_flag_enabled("INTRADAY_SIGNAL_ALERT_ONLY")
+        if self._env_flag_enabled("INTRADAY_SIGNAL_ALERT_ONLY"):
+            logger.info("盘中信号提醒已取消：忽略 INTRADAY_SIGNAL_ALERT_ONLY=true")
+        return False
 
     @staticmethod
     def _env_int(name: str, default: int) -> int:
@@ -3189,7 +3191,7 @@ class StockAnalysisPipeline:
                 candidates.append((signal, result))
 
         if not candidates:
-            if not self._env_flag_enabled("INTRADAY_SIGNAL_SEND_EMPTY", "true"):
+            if not self._env_flag_enabled("INTRADAY_SIGNAL_SEND_EMPTY", "false"):
                 logger.info("盘中信号提醒：本轮未发现买点/卖点候选，不发送 alert")
                 return
 

@@ -706,7 +706,7 @@ class Config:
     brave_api_keys: List[str] = field(default_factory=list)  # Brave Search API Keys
     serpapi_keys: List[str] = field(default_factory=list)  # SerpAPI Keys
     searxng_base_urls: List[str] = field(default_factory=list)  # SearXNG instance URLs (self-hosted, no quota)
-    searxng_public_instances_enabled: bool = False  # Auto-discover public SearXNG instances when base URLs are absent
+    searxng_public_instances_enabled: bool = True  # Auto-discover public SearXNG instances when base URLs are absent
 
     # === Social Sentiment (US stocks only, api.adanos.org) ===
     social_sentiment_api_key: Optional[str] = None
@@ -890,13 +890,6 @@ class Config:
     backtest_min_age_days: int = 14
     backtest_engine_version: str = "v1"
     backtest_neutral_band_pct: float = 2.0
-
-    # === 机会雷达配置 ===
-    opportunity_radar_enabled: bool = False
-    opportunity_radar_min_score: int = 60
-    opportunity_radar_top_n: int = 6
-    opportunity_radar_fund_top_n: int = 4
-    opportunity_fund_list: List[str] = field(default_factory=list)
     
     # === 日志配置 ===
     log_dir: str = "./logs"  # 日志文件目录
@@ -1380,7 +1373,7 @@ class Config:
             )
         searxng_public_instances_enabled = parse_env_bool(
             os.getenv('SEARXNG_PUBLIC_INSTANCES_ENABLED'),
-            default=False,
+            default=True,
         )
 
         # 企微消息类型与最大字节数逻辑
@@ -1749,36 +1742,6 @@ class Config:
                 field_name='BACKTEST_NEUTRAL_BAND_PCT',
                 minimum=0.0,
             ),
-            opportunity_radar_enabled=parse_env_bool(
-                os.getenv('OPPORTUNITY_RADAR_ENABLED'),
-                default=False,
-            ),
-            opportunity_radar_min_score=parse_env_int(
-                os.getenv('OPPORTUNITY_RADAR_MIN_SCORE'),
-                60,
-                field_name='OPPORTUNITY_RADAR_MIN_SCORE',
-                minimum=0,
-                maximum=100,
-            ),
-            opportunity_radar_top_n=parse_env_int(
-                os.getenv('OPPORTUNITY_RADAR_TOP_N'),
-                6,
-                field_name='OPPORTUNITY_RADAR_TOP_N',
-                minimum=1,
-                maximum=50,
-            ),
-            opportunity_radar_fund_top_n=parse_env_int(
-                os.getenv('OPPORTUNITY_RADAR_FUND_TOP_N'),
-                4,
-                field_name='OPPORTUNITY_RADAR_FUND_TOP_N',
-                minimum=0,
-                maximum=50,
-            ),
-            opportunity_fund_list=[
-                item.strip()
-                for item in os.getenv('OPPORTUNITY_FUND_LIST', '').split(',')
-                if item.strip()
-            ],
             log_dir=os.getenv('LOG_DIR', './logs'),
             log_level=os.getenv('LOG_LEVEL', 'INFO'),
             max_workers=parse_env_int(os.getenv('MAX_WORKERS'), 3, field_name='MAX_WORKERS', minimum=1),

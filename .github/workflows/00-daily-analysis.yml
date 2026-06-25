@@ -2,17 +2,8 @@ name: 每日股票分析
 
 on:
   # 定时触发：
-  # - 盘中：覆盖 A 股主要交易时段，用于买点/卖点候选提醒
   # - 日报：北京时间 15:30，用于完整日报与大盘复盘
   schedule:
-    - cron: '40 1 * * 1-5'      # 周一到周五，UTC 01:40 = 北京时间 09:40（早盘买卖点）
-    - cron: '10 2 * * 1-5'      # 周一到周五，UTC 02:10 = 北京时间 10:10（早盘买卖点）
-    - cron: '40 2 * * 1-5'      # 周一到周五，UTC 02:40 = 北京时间 10:40（早盘买卖点）
-    - cron: '10 3 * * 1-5'      # 周一到周五，UTC 03:10 = 北京时间 11:10（午前买卖点）
-    - cron: '10 5 * * 1-5'      # 周一到周五，UTC 05:10 = 北京时间 13:10（午后买卖点）
-    - cron: '40 5 * * 1-5'      # 周一到周五，UTC 05:40 = 北京时间 13:40（午后买卖点）
-    - cron: '10 6 * * 1-5'      # 周一到周五，UTC 06:10 = 北京时间 14:10（尾盘前买卖点）
-    - cron: '40 6 * * 1-5'      # 周一到周五，UTC 06:40 = 北京时间 14:40（尾盘买卖点）
     - cron: '30 7 * * 1-5'      # 周一到周五，UTC 07:30 = 北京时间 15:30（日报）
   
   # 手动触发
@@ -29,11 +20,6 @@ on:
           - stocks-only   # 仅股票分析
       force_run:
         description: '强制运行（跳过交易日检查）'
-        required: false
-        default: false
-        type: boolean
-      intraday_alert_test:
-        description: '盘中买卖点提醒测试（仅自选股；无信号也推送状态）'
         required: false
         default: false
         type: boolean
@@ -386,15 +372,14 @@ jobs:
           REPORT_LANGUAGE: ${{ vars.REPORT_LANGUAGE || secrets.REPORT_LANGUAGE || '' }}
           REPORT_SHOW_LLM_MODEL: ${{ vars.REPORT_SHOW_LLM_MODEL || secrets.REPORT_SHOW_LLM_MODEL || 'true' }}
           REPORT_INTEGRITY_ENABLED: ${{ vars.REPORT_INTEGRITY_ENABLED || secrets.REPORT_INTEGRITY_ENABLED || 'true' }}
-          REPORT_INTEGRITY_RETRY: ${{ vars.REPORT_INTEGRITY_RETRY || secrets.REPORT_INTEGRITY_RETRY || '1' }}
+          REPORT_INTEGRITY_RETRY: ${{ vars.REPORT_INTEGRITY_RETRY || secrets.REPORT_INTEGRITY_RETRY || '0' }}
           REPORT_HISTORY_COMPARE_N: ${{ vars.REPORT_HISTORY_COMPARE_N || secrets.REPORT_HISTORY_COMPARE_N || '0' }}
           SINGLE_STOCK_NOTIFY: ${{ vars.SINGLE_STOCK_NOTIFY || secrets.SINGLE_STOCK_NOTIFY || 'false' }}
           MERGE_EMAIL_NOTIFICATION: ${{ vars.MERGE_EMAIL_NOTIFICATION || secrets.MERGE_EMAIL_NOTIFICATION || 'false' }}
           MARKDOWN_TO_IMAGE_CHANNELS: ${{ vars.MARKDOWN_TO_IMAGE_CHANNELS || secrets.MARKDOWN_TO_IMAGE_CHANNELS }}
           MARKDOWN_TO_IMAGE_MAX_CHARS: ${{ vars.MARKDOWN_TO_IMAGE_MAX_CHARS || secrets.MARKDOWN_TO_IMAGE_MAX_CHARS || '15000' }}
-          INTRADAY_SIGNAL_ALERT_ONLY: ${{ vars.INTRADAY_SIGNAL_ALERT_ONLY || secrets.INTRADAY_SIGNAL_ALERT_ONLY || 'false' }}
-          INTRADAY_BUY_SIGNAL_MIN_SCORE: ${{ vars.INTRADAY_BUY_SIGNAL_MIN_SCORE || secrets.INTRADAY_BUY_SIGNAL_MIN_SCORE || '60' }}
-          INTRADAY_SIGNAL_SEND_EMPTY: ${{ vars.INTRADAY_SIGNAL_SEND_EMPTY || secrets.INTRADAY_SIGNAL_SEND_EMPTY || 'true' }}
+          INTRADAY_SIGNAL_ALERT_ONLY: 'false'
+          INTRADAY_SIGNAL_SEND_EMPTY: 'false'
           OPPORTUNITY_RADAR_ENABLED: ${{ vars.OPPORTUNITY_RADAR_ENABLED || secrets.OPPORTUNITY_RADAR_ENABLED || 'true' }}
           OPPORTUNITY_RADAR_MIN_SCORE: ${{ vars.OPPORTUNITY_RADAR_MIN_SCORE || secrets.OPPORTUNITY_RADAR_MIN_SCORE || '60' }}
           OPPORTUNITY_RADAR_TOP_N: ${{ vars.OPPORTUNITY_RADAR_TOP_N || secrets.OPPORTUNITY_RADAR_TOP_N || '6' }}
@@ -453,23 +438,12 @@ jobs:
           MODE="${{ github.event.inputs.mode || 'full' }}"
           if [ "${{ github.event_name }}" = "schedule" ]; then
             case "${{ github.event.schedule }}" in
-              "40 1 * * 1-5"|"10 2 * * 1-5"|"40 2 * * 1-5"|"10 3 * * 1-5"|"10 5 * * 1-5"|"40 5 * * 1-5"|"10 6 * * 1-5"|"40 6 * * 1-5")
-                MODE="stocks-only"
-                export INTRADAY_SIGNAL_ALERT_ONLY="true"
-                echo "📡 盘中买卖点定时任务：仅运行自选股，若出现买点/卖点候选则发送提醒"
-                ;;
-              "0 10 * * 1-5")
+              "30 7 * * 1-5")
                 MODE="full"
                 export INTRADAY_SIGNAL_ALERT_ONLY="false"
                 echo "🧾 日报定时任务：运行完整日报与大盘复盘"
                 ;;
             esac
-          fi
-          if [ "${{ github.event.inputs.intraday_alert_test || 'false' }}" = "true" ]; then
-            MODE="stocks-only"
-            export INTRADAY_SIGNAL_ALERT_ONLY="true"
-            export INTRADAY_SIGNAL_SEND_EMPTY="true"
-            echo "🧪 手动盘中买卖点提醒测试：仅运行自选股，无候选也推送状态"
           fi
           
           echo "=========================================="
@@ -480,9 +454,7 @@ jobs:
           echo "📊 自选股: $STOCK_LIST"
           echo "📝 报告类型: $REPORT_TYPE"
           echo "🧪 报告完整性: $REPORT_INTEGRITY_ENABLED (retry=$REPORT_INTEGRITY_RETRY)"
-          echo "🔔 盘中信号提醒: $INTRADAY_SIGNAL_ALERT_ONLY"
-          echo "📭 无信号状态推送: $INTRADAY_SIGNAL_SEND_EMPTY"
-          echo "🎯 买点提醒最低评分: $INTRADAY_BUY_SIGNAL_MIN_SCORE"
+          echo "🔕 盘中买卖点提醒: 已取消"
           echo "🧭 机会雷达: $OPPORTUNITY_RADAR_ENABLED (min=$OPPORTUNITY_RADAR_MIN_SCORE, top=$OPPORTUNITY_RADAR_TOP_N)"
           echo "🧺 场外基金候选: $([ -n "$OPPORTUNITY_FUND_LIST" ] && echo '✅ 已配置' || echo '⚪ 未配置')"
           echo "🔁 自动回测: $BACKTEST_ENABLED (${BACKTEST_EVAL_WINDOW_DAYS}d/${BACKTEST_MIN_AGE_DAYS}d)"

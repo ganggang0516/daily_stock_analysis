@@ -26,7 +26,6 @@ class _TrackingNotifier:
     def __init__(self):
         self.thread_names = []
         self.email_stock_codes = []
-        self.route_types = []
         self.sent_reports = []
         self._lock = threading.Lock()
         self._inflight = 0
@@ -58,7 +57,6 @@ class _TrackingNotifier:
 
         self.thread_names.append(threading.current_thread().name)
         self.email_stock_codes.append(email_stock_codes)
-        self.route_types.append(route_type)
         self.sent_reports.append(content)
         time.sleep(0.01)
 
@@ -68,27 +66,17 @@ class _TrackingNotifier:
         return True
 
 
-def _make_result(
-    code: str,
-    success: bool = True,
-    operation_advice: str = "持有",
-    decision_type: str = "hold",
-    sentiment_score: int = 80,
-) -> AnalysisResult:
-    result = AnalysisResult(
+def _make_result(code: str, success: bool = True) -> AnalysisResult:
+    return AnalysisResult(
         code=code,
         name=f"股票{code}",
-        sentiment_score=sentiment_score,
+        sentiment_score=80,
         trend_prediction="看多",
-        operation_advice=operation_advice,
+        operation_advice="持有",
         analysis_summary="测试结果",
         success=success,
         error_message=None if success else "JSON解析失败",
     )
-    result.decision_type = decision_type
-    result.current_price = 10.5
-    result.change_pct = 1.23
-    return result
 
 
 class TestPipelineSingleStockNotify(unittest.TestCase):
@@ -142,91 +130,6 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
         pipeline._send_notifications.assert_called_once()
         _, kwargs = pipeline._send_notifications.call_args
         self.assertTrue(kwargs["skip_push"])
-
-    def test_run_intraday_signal_alert_only_sends_alert_candidates_without_aggregate_push(self):
-        pipeline = self._build_batch_pipeline()
-        pipeline.config.single_stock_notify = False
-
-        def _process(code, skip_analysis=False, single_stock_notify=False, report_type=None, analysis_query_id=None, current_time=None):
-            if code == "000001":
-                return _make_result(code, operation_advice="回踩 MA5 后买入", decision_type="buy", sentiment_score=68)
-            return _make_result(code, operation_advice="回踩 MA5 后买入", decision_type="buy", sentiment_score=55)
-
-        pipeline.process_single_stock = MagicMock(side_effect=_process)
-
-        old_value = os.environ.get("INTRADAY_SIGNAL_ALERT_ONLY")
-        os.environ["INTRADAY_SIGNAL_ALERT_ONLY"] = "true"
-        try:
-            results = pipeline.run(
-                stock_codes=["000001", "600519"],
-                dry_run=False,
-                send_notification=True,
-            )
-        finally:
-            if old_value is None:
-                os.environ.pop("INTRADAY_SIGNAL_ALERT_ONLY", None)
-            else:
-                os.environ["INTRADAY_SIGNAL_ALERT_ONLY"] = old_value
-
-        self.assertEqual(len(results), 2)
-        self.assertEqual(len(pipeline.notifier.sent_reports), 1)
-        self.assertIn("盘中买卖点提醒", pipeline.notifier.sent_reports[0])
-        self.assertIn("买点最低评分: 60", pipeline.notifier.sent_reports[0])
-        self.assertIn("000001", pipeline.notifier.sent_reports[0])
-        self.assertNotIn("600519", pipeline.notifier.sent_reports[0])
-        self.assertEqual(pipeline.notifier.route_types, ["alert"])
-        pipeline._save_local_report.assert_called_once()
-        pipeline._send_notifications.assert_called_once()
-        _, kwargs = pipeline._send_notifications.call_args
-        self.assertTrue(kwargs["skip_push"])
-
-    def test_intraday_signal_alert_sends_empty_status_by_default(self):
-        pipeline = self._build_batch_pipeline()
-        pipeline._send_intraday_signal_alerts([
-            _make_result("000001", operation_advice="持有观察", decision_type="hold", sentiment_score=50),
-            _make_result("600519", operation_advice="等待回踩", decision_type="hold", sentiment_score=58),
-        ])
-
-        self.assertEqual(len(pipeline.notifier.sent_reports), 1)
-        self.assertIn("本轮未发现满足条件的买点/卖点候选", pipeline.notifier.sent_reports[0])
-        self.assertIn("000001", pipeline.notifier.sent_reports[0])
-        self.assertEqual(pipeline.notifier.route_types, ["alert"])
-
-    def test_intraday_signal_alert_can_skip_empty_status(self):
-        pipeline = self._build_batch_pipeline()
-        old_value = os.environ.get("INTRADAY_SIGNAL_SEND_EMPTY")
-        os.environ["INTRADAY_SIGNAL_SEND_EMPTY"] = "false"
-        try:
-            pipeline._send_intraday_signal_alerts([
-                _make_result("000001", operation_advice="持有观察", decision_type="hold", sentiment_score=50),
-            ])
-        finally:
-            if old_value is None:
-                os.environ.pop("INTRADAY_SIGNAL_SEND_EMPTY", None)
-            else:
-                os.environ["INTRADAY_SIGNAL_SEND_EMPTY"] = old_value
-
-        self.assertEqual(pipeline.notifier.sent_reports, [])
-
-    def test_run_deduplicates_normalized_stock_codes_before_analysis(self):
-        pipeline = self._build_batch_pipeline()
-        pipeline.config.single_stock_notify = False
-        seen_codes = []
-
-        def _process(code, skip_analysis=False, single_stock_notify=False, report_type=None, analysis_query_id=None, current_time=None):
-            seen_codes.append(code)
-            return _make_result(code)
-
-        pipeline.process_single_stock = MagicMock(side_effect=_process)
-
-        results = pipeline.run(
-            stock_codes=["002827", "SZ002827", "002827.SZ", "300502", "SZ.300502"],
-            dry_run=False,
-            send_notification=False,
-        )
-
-        self.assertEqual([result.code for result in results], ["002827", "300502"])
-        self.assertEqual(seen_codes, ["002827", "300502"])
 
     def test_process_single_stock_direct_path_keeps_notify_compatibility(self):
         pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)

@@ -39,8 +39,13 @@ def normalize_fund_code(code: str | int | None) -> str:
     return text
 
 
-def get_fund_name(code: str | int | None, fallback: Optional[str] = None) -> str:
+def get_fund_name(
+    code: str | int | None,
+    fallback: Optional[str] = None,
+    allow_network: bool = False,
+) -> str:
     """Return the display name for a fund, falling back safely to code/fallback."""
+    _ = allow_network
     normalized_code = normalize_fund_code(code)
     if normalized_code in FUND_NAME_MAP:
         return FUND_NAME_MAP[normalized_code]
