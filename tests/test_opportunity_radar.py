@@ -12,6 +12,7 @@ from src.services.opportunity_radar import (
     format_opportunity_radar_report,
     parse_fund_candidate_specs,
 )
+from src.data.fund_mapping import get_fund_name, normalize_fund_code
 
 
 def _analysis_result(**overrides):
@@ -42,6 +43,11 @@ def _analysis_result(**overrides):
 
 
 class OpportunityRadarTestCase(unittest.TestCase):
+    def test_fund_mapping_falls_back_safely(self):
+        self.assertEqual(normalize_fund_code(8888), "008888")
+        self.assertEqual(get_fund_name("008888"), "场外基金008888")
+        self.assertEqual(get_fund_name("999999"), "999999")
+
     def test_buy_candidate_near_sniper_point_is_selected(self):
         candidates = build_stock_candidates([_analysis_result()], min_score=60, top_n=3)
 
