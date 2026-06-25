@@ -368,7 +368,8 @@ jobs:
           # ==========================================
           # 运行配置 ⬅️ 新增！
           # ==========================================
-          REPORT_TYPE: ${{ vars.REPORT_TYPE || secrets.REPORT_TYPE || 'simple' }}
+          REPORT_TYPE: ${{ vars.REPORT_TYPE || secrets.REPORT_TYPE || 'full' }}
+          REPORT_SUMMARY_ONLY: ${{ vars.REPORT_SUMMARY_ONLY || secrets.REPORT_SUMMARY_ONLY || 'false' }}
           REPORT_LANGUAGE: ${{ vars.REPORT_LANGUAGE || secrets.REPORT_LANGUAGE || '' }}
           REPORT_SHOW_LLM_MODEL: ${{ vars.REPORT_SHOW_LLM_MODEL || secrets.REPORT_SHOW_LLM_MODEL || 'true' }}
           REPORT_INTEGRITY_ENABLED: ${{ vars.REPORT_INTEGRITY_ENABLED || secrets.REPORT_INTEGRITY_ENABLED || 'true' }}
@@ -440,8 +441,10 @@ jobs:
             case "${{ github.event.schedule }}" in
               "30 7 * * 1-5")
                 MODE="full"
+                export REPORT_TYPE="full"
+                export REPORT_SUMMARY_ONLY="false"
                 export INTRADAY_SIGNAL_ALERT_ONLY="false"
-                echo "🧾 日报定时任务：运行完整日报与大盘复盘"
+                echo "🧾 日报定时任务：运行完整逐股日报与大盘复盘"
                 ;;
             esac
           fi
@@ -453,6 +456,7 @@ jobs:
           echo "🎯 运行模式: $MODE"
           echo "📊 自选股: $STOCK_LIST"
           echo "📝 报告类型: $REPORT_TYPE"
+          echo "📚 个股详情: $([ "${REPORT_SUMMARY_ONLY,,}" = "true" ] && echo '仅摘要' || echo '完整逐股评测')"
           echo "🧪 报告完整性: $REPORT_INTEGRITY_ENABLED (retry=$REPORT_INTEGRITY_RETRY)"
           echo "🔕 盘中买卖点提醒: 已取消"
           echo "🧭 机会雷达: $OPPORTUNITY_RADAR_ENABLED (min=$OPPORTUNITY_RADAR_MIN_SCORE, top=$OPPORTUNITY_RADAR_TOP_N)"
