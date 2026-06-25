@@ -2,9 +2,9 @@ name: 每日股票分析
 
 on:
   # 定时触发：
-  # - 日报：北京时间 18:00，用于完整日报与大盘复盘
+  # - 日报：北京时间 15:30，用于完整日报与大盘复盘
   schedule:
-    - cron: '0 10 * * 1-5'      # 周一到周五，UTC 10:00 = 北京时间 18:00（日报）
+    - cron: '30 7 * * 1-5'      # 周一到周五，UTC 07:30 = 北京时间 15:30（日报）
   
   # 手动触发
   workflow_dispatch:
@@ -438,7 +438,7 @@ jobs:
           MODE="${{ github.event.inputs.mode || 'full' }}"
           if [ "${{ github.event_name }}" = "schedule" ]; then
             case "${{ github.event.schedule }}" in
-              "0 10 * * 1-5")
+              "30 7 * * 1-5")
                 MODE="full"
                 export INTRADAY_SIGNAL_ALERT_ONLY="false"
                 echo "🧾 日报定时任务：运行完整日报与大盘复盘"
